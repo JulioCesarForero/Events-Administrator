@@ -21,16 +21,19 @@ Plantilla base empresarial para el MVP de gestion de ubicaciones y reservas de c
 - `cicd`: pipelines y plantillas de automatizacion
 - `docs`: arquitectura, runbooks y onboarding
 
-## Quick start local
+## Quick start local (Docker)
 
-1. Copia variables de entorno:
-   - `.env.example` -> `.env`
-2. Levanta servicios:
-   - `docker compose -f docker/compose.local.yml up --build`
-3. Accesos:
-   - Frontend: `http://localhost`
-   - API: `http://localhost/api`
-   - Swagger: `http://localhost/api/docs`
+1. Copia variables de entorno: `.env.example` → `.env` en la raíz del repo (ajusta `DATABASE_URL`, `JWT_SECRET`, etc.).
+2. Aplica el modelo SQL en PostgreSQL cuando uses la API (scripts en `data-model/scripts` o el compose de `data-model/docker`).
+3. Desde la raíz del repositorio:
+   - `docker compose -f docker/compose.local.yml --env-file .env up --build`
+4. Accesos:
+   - Frontend: `http://localhost` (puerto `NGINX_PORT`, por defecto 80)
+   - API vía nginx: `http://localhost/api` (p. ej. `http://localhost/api/v1/...`)
+   - API directa al contenedor: `http://localhost:8000` (puerto `BACKEND_PORT`)
+   - Swagger (con `DEBUG=true`): `http://localhost:8000/docs` o `http://localhost/api/docs`
+
+Solo backend + Postgres: ver [backend-api/docker/README.md](backend-api/docker/README.md).
 
 ## Flujo recomendado de ramas
 

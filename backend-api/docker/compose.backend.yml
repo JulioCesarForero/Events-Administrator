@@ -1,0 +1,48 @@
+# Backend + PostgreSQL only (no nginx/frontend). Run from repository root:
+#   docker compose -f backend-api/docker/compose.backend.yml --env-file .env up --build
+#
+# Or from this folder (adjust --env-file path):
+#   docker compose -f compose.backend.yml --env-file ../../.env up --build
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: events_backend_db
+    env_file:
+      - ../../.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - events_backend_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+    container_name: events_backend_api
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ISSUER: ${JWT_ISSUER:-events-administrator}
+      DEBUG: ${DEBUG:-true}
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+volumes:
+  events_backend_pgdata:

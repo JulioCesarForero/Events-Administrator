@@ -1,16 +1,43 @@
 # Docker
 
-Archivos de contenedorizacion para entorno local y CI.
+Contenedores para entorno local (y base para CI). El **backend FastAPI** se construye con [backend.Dockerfile](backend.Dockerfile) (contexto: raíz del repo).
 
-## Levantar entorno local
+## Requisitos
+
+- Docker Engine + Docker Compose v2
+- Archivo `.env` en la raíz del repositorio (copia desde [`.env.example`](../.env.example))
+
+## Levantar entorno local completo
+
+Desde esta carpeta `docker/`:
 
 ```bash
-docker compose -f compose.local.yml up --build
+docker compose -f compose.local.yml --env-file ../.env up --build
 ```
 
 ## Servicios
 
-- `frontend`: build React
-- `backend`: FastAPI
-- `db`: PostgreSQL
-- `nginx`: reverse proxy
+| Servicio   | Descripción |
+|------------|-------------|
+| `db`       | PostgreSQL 16; healthcheck con `pg_isready` |
+| `backend`  | FastAPI (imagen slim, usuario no root, `HEALTHCHECK` en `/health/live`) |
+| `frontend` | SPA React |
+| `nginx`    | Reverse proxy: `/api/*` → backend `:8000` |
+
+## URLs útiles
+
+- Nginx (front + API bajo `/api`): `http://localhost` (puerto `NGINX_PORT`, por defecto 80)
+- API directa (omitir nginx): `http://localhost:${BACKEND_PORT}` (por defecto 8000)
+- OpenAPI (si `DEBUG=true`): `http://localhost:8000/docs`
+
+`DATABASE_URL` en `.env` debe apuntar al host `db` dentro de la red Compose, por ejemplo:
+
+`postgresql+psycopg://events_user:events_pass@db:5432/events_admin`
+
+## Solo backend + base de datos
+
+Ver [backend-api/docker/README.md](../backend-api/docker/README.md).
+
+## Base de datos
+
+Crear el esquema `events` con los scripts en `data-model/scripts` antes de usar la API en serio (o usar el compose de `data-model/docker` y apuntar `DATABASE_URL` al host/puerto expuestos).
