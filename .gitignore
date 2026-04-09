@@ -1,0 +1,62 @@
+# --- Entorno y secretos ---
+.env
+.env.local
+.env.*.local
+*.pem
+
+# --- Python / backend-api ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+pip-log.txt
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/build/
+.npm
+*.tsbuildinfo
+.pnpm-store/
+
+# --- IDE y editores ---
+.idea/
+*.swp
+*.swo
+*~
+
+# --- SO ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Logs y temporales ---
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# --- Docker / volúmenes locales (nombres habituales) ---
+# No ignorar docker-compose ni Dockerfiles; solo datos locales si se montan en repo
+*.local.override.yml
+
+# --- Herramientas / misc ---
+.tox/
+.nox/
+hypothesis/
