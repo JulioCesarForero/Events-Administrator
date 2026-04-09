@@ -1,0 +1,30 @@
+name: ci-backend
+
+on:
+  pull_request:
+    paths:
+      - "backend-api/**"
+      - "cicd/github/workflows/ci-backend.yml"
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: events_admin
+          POSTGRES_USER: events_user
+          POSTGRES_PASSWORD: events_pass
+        ports:
+          - 5432:5432
+    defaults:
+      run:
+        working-directory: backend-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements/dev.txt
+      - run: pytest -q

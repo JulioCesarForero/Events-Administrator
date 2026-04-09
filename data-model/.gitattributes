@@ -1,0 +1,2 @@
+docker/init/*.sh text eol=lf
+scripts/run_all.sh text eol=lf
