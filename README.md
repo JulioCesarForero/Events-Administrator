@@ -31,7 +31,7 @@ Plantilla base empresarial para el MVP de gestion de ubicaciones y reservas de c
    - Frontend: `http://localhost` (puerto `NGINX_PORT`, por defecto 80)
    - API vía nginx: `http://localhost/api` (p. ej. `http://localhost/api/v1/...`)
    - API directa al contenedor: `http://localhost:8000` (puerto `BACKEND_PORT`)
-   - Swagger (con `DEBUG=true`): `http://localhost:8000/docs` o `http://localhost/api/docs`
+   - Swagger (con `DEBUG=true` y `ROOT_PATH=/api`): **`http://localhost/api/docs`** (recomendado con Nginx); en `:8000/docs` solo si `ROOT_PATH` está vacío
 
 Solo backend + Postgres: ver [backend-api/docker/README.md](backend-api/docker/README.md).
 

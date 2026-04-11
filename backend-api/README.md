@@ -162,6 +162,7 @@ Guía de colección, variables y criterios P90/P95: [docs/postman.md](docs/postm
 | `Not allowed for this event` | Staff sin fila en `event_organizer_assignment` ni membresía de tenant. |
 | Swagger no visible | `DEBUG=false`; poner `DEBUG=true` solo en dev. |
 | Tras nginx, 404 en rutas | Usar prefijo `/api` delante: `/api/v1/...` (ver `nginx/nginx.conf`). |
+| Swagger “Try it out” falla o apunta mal | Con Nginx usa `http://localhost/api/docs` y `ROOT_PATH=/api` (compose por defecto). Solo puerto 8000: `ROOT_PATH=` vacío en `.env`. |
 
 ## Enlaces
 

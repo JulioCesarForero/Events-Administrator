@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     cors_origins: str = Field(default="*", validation_alias="CORS_ORIGINS")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
 
+    # Prefijo público cuando Nginx (u otro proxy) expone la API bajo /api (Swagger / Try it out).
+    root_path: str = Field(default="", validation_alias="ROOT_PATH")
+
 
 @lru_cache
 def get_settings() -> Settings:

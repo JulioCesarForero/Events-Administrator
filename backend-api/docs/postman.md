@@ -4,8 +4,8 @@
 
 | Variable | Ejemplo | Uso |
 |----------|---------|-----|
-| `baseUrl` | `http://localhost:8000` | API directa al contenedor o uvicorn local |
-| `baseUrlNginx` | `http://localhost` | Si usas nginx, prefijo `/api` → rutas sin `/api` en path del request (ver nota abajo) |
+| `baseUrl` | `http://localhost:8000` | API directa al contenedor o uvicorn local (rutas `/v1/...`, `/health/...`) |
+| `baseUrlNginx` | `http://localhost` | Con Nginx + `ROOT_PATH=/api`: rutas **`/api/v1/...`**, **`/api/health/...`** |
 | `staffToken` | *(Bearer sin prefijo)* | Tras `POST /v1/auth/staff-login` |
 | `buyerToken` | *(Bearer sin prefijo)* | Tras `POST /v1/auth/code-login` → campo `session_token` |
 | `tenantId` | UUID | Tenant demo u organización |
@@ -18,7 +18,9 @@
 | `paymentId` | UUID | Pago aprobado |
 | `reservationId` | UUID | Reserva creada |
 
-**Nginx:** las peticiones van a `{{baseUrlNginx}}/api/v1/...` (el proxy quita `/api` y reenvía a `/v1/...`).
+**Nginx:** usa `{{baseUrlNginx}}/api/v1/...`. El backend recibe `/v1/...`; `ROOT_PATH=/api` mantiene alineados Swagger y Postman.
+
+**Swagger:** con Docker Compose y Nginx, abre `http://localhost/api/docs` (no `:8000/docs`) si `ROOT_PATH=/api`.
 
 ## Estructura de carpetas en Postman
 

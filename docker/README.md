@@ -26,9 +26,10 @@ docker compose -f compose.local.yml --env-file ../.env up --build
 
 ## URLs útiles
 
-- Nginx (front + API bajo `/api`): `http://localhost` (puerto `NGINX_PORT`, por defecto 80)
-- API directa (omitir nginx): `http://localhost:${BACKEND_PORT}` (por defecto 8000)
-- OpenAPI (si `DEBUG=true`): `http://localhost:8000/docs`
+- Nginx (API bajo `/api`): `http://localhost` (puerto `NGINX_PORT`, por defecto 80)
+- API directa al contenedor: `http://localhost:${BACKEND_PORT}` (rutas `/v1/...`, sin `/api`)
+- Swagger detrás de Nginx: `http://localhost/api/docs` (con `DEBUG=true` y `ROOT_PATH=/api`, por defecto en `compose.local.yml`)
+- Swagger solo en puerto 8000: `http://localhost:8000/docs` (si necesitas “Try it out” ahí, usa `ROOT_PATH=` vacío en `.env`)
 
 `DATABASE_URL` en `.env` debe apuntar al host `db` dentro de la red Compose, por ejemplo:
 
