@@ -1,0 +1,314 @@
+{
+  "info": {
+    "name": "Events Administrator API",
+    "description": "Complete API collection for Events Administrator MVP. Use with Nginx (baseUrl=http://localhost/api) or direct (baseUrl=http://localhost:8000).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost/api", "description": "API base URL (via Nginx)" },
+    { "key": "staffToken", "value": "", "description": "JWT for staff endpoints" },
+    { "key": "buyerToken", "value": "", "description": "JWT for buyer endpoints" },
+    { "key": "tenantId", "value": "", "description": "Tenant UUID" },
+    { "key": "eventId", "value": "", "description": "Event UUID" },
+    { "key": "groupId", "value": "", "description": "AttendeeGroup UUID" },
+    { "key": "venueId", "value": "", "description": "Venue UUID" },
+    { "key": "layoutId", "value": "", "description": "Layout UUID" },
+    { "key": "paymentId", "value": "", "description": "Payment UUID" },
+    { "key": "reservationId", "value": "", "description": "Reservation UUID" },
+    { "key": "policyDocId", "value": "", "description": "Policy document UUID" },
+    { "key": "termsDocId", "value": "", "description": "Terms document UUID" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health/live",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/health/live" } }
+        },
+        {
+          "name": "GET /health/ready",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/health/ready" } }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST Staff Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('staffToken', json.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/auth/staff-login" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"email\": \"admin@demo.local\", \"password\": \"Admin123!\" }"
+            }
+          }
+        },
+        {
+          "name": "POST Code Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.sessionToken) pm.collectionVariables.set('buyerToken', json.sessionToken);",
+                  "if (json.eventId) pm.collectionVariables.set('eventId', json.eventId);",
+                  "if (json.groupId) pm.collectionVariables.set('groupId', json.groupId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/auth/code-login" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"eventId\": \"{{eventId}}\", \"studentCode\": \"STU-001\" }"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Venues",
+      "item": [
+        {
+          "name": "GET Venues",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/venues?tenantId={{tenantId}}" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
+          "name": "POST Create Venue",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/venues" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"tenantId\": \"{{tenantId}}\", \"name\": \"Salon Principal\", \"address\": \"Calle 1\", \"defaultTimezone\": \"America/Bogota\" }"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "GET Events",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/events?tenantId={{tenantId}}" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
+          "name": "POST Create Event",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/events" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"tenantId\": \"{{tenantId}}\", \"venueId\": \"{{venueId}}\", \"name\": \"Evento Demo\", \"eventDate\": \"2026-12-15T19:00:00Z\" }"
+            }
+          }
+        },
+        {
+          "name": "PUT Event Configuration",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/configuration" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"timezone\": \"America/Bogota\", \"presaleStartDate\": \"2026-10-01T00:00:00Z\", \"presaleEndDate\": \"2026-11-01T00:00:00Z\", \"saleStartDate\": \"2026-11-01T00:00:00Z\", \"saleEndDate\": \"2026-12-14T23:59:59Z\", \"maxPresaleTickets\": 4, \"maxSaleTickets\": 3 }"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Import",
+      "item": [
+        {
+          "name": "POST Student Import",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/student-imports" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fileName\": \"padron.csv\", \"expectedColumns\": [\"codigo_unico\", \"apellidos\", \"nombres\"], \"rows\": [{ \"studentCode\": \"STU-001\", \"firstName\": \"Juan\", \"lastName\": \"Perez\" }] }"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attendees",
+      "item": [
+        {
+          "name": "GET My Group",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/portal/events/{{eventId}}/my-group" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{buyerToken}}" }]
+          }
+        },
+        {
+          "name": "POST Add Participant",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/groups/{{groupId}}/participants" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyerToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"firstName\": \"Juan\", \"lastName\": \"Perez\", \"documentType\": \"CC\", \"documentId\": \"123456\", \"mobilePhone\": \"+573001234567\", \"emergencyContactName\": \"Maria Perez\", \"emergencyContactPhone\": \"+573007654321\" }"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "POST Create Payment",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/groups/{{groupId}}/payments" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyerToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"paymentType\": \"DIGITAL\", \"ticketQuantity\": 1 }"
+            }
+          }
+        },
+        {
+          "name": "POST Submit Payment",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/payments/{{paymentId}}/submit" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{buyerToken}}" }]
+          }
+        },
+        {
+          "name": "POST Approve Payment",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/payments/{{paymentId}}/approve" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        },
+        {
+          "name": "GET Payment Inbox",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/payment-inbox" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Map",
+      "item": [
+        {
+          "name": "GET Event Map",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/map" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{buyerToken}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "POST Create Reservation",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/reservations" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{buyerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"paymentId\": \"{{paymentId}}\", \"allocations\": [{ \"layoutTableId\": \"<TABLE_ID>\", \"spots\": 1 }], \"policyDocumentId\": \"{{policyDocId}}\", \"termsDocumentId\": \"{{termsDocId}}\" }"
+            }
+          }
+        },
+        {
+          "name": "POST Release Reservation",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/reservations/{{reservationId}}/release" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{buyerToken}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit",
+      "item": [
+        {
+          "name": "GET Audit Log",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/audit-log" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -2,7 +2,9 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -31,7 +33,7 @@ def _ensure_tenant_staff(db: Session, staff_id: UUID, tenant_id: UUID) -> None:
         raise HTTPException(status_code=403, detail="Not allowed for this tenant")
 
 
-class EventCreate(BaseModel):
+class EventCreate(CamelModel):
     tenant_id: UUID
     venue_id: UUID
     name: str = Field(max_length=300)
@@ -45,15 +47,13 @@ class EventCreate(BaseModel):
     status: str = Field(default="DRAFT", max_length=32)
 
 
-class EventOut(BaseModel):
+class EventOut(CamelOrmModel):
     id: UUID
     tenant_id: UUID
     venue_id: UUID
     name: str
     event_date: datetime
     status: str
-
-    model_config = {"from_attributes": True}
 
 
 @router.get("", response_model=list[EventOut])
@@ -91,7 +91,7 @@ def create_event(body: EventCreate, db: DbSession, staff: StaffUserDep) -> Event
     return ev
 
 
-class EventConfigurationUpdate(BaseModel):
+class EventConfigurationUpdate(CamelModel):
     timezone: str = Field(default="America/Bogota", max_length=64)
     presale_start_date: datetime
     presale_end_date: datetime
@@ -102,7 +102,7 @@ class EventConfigurationUpdate(BaseModel):
     map_visibility_policy: str = Field(default="AFTER_PAYMENT_APPROVED", max_length=64)
 
 
-class EventConfigurationOut(BaseModel):
+class EventConfigurationOut(CamelOrmModel):
     id: UUID
     event_id: UUID
     timezone: str
@@ -113,8 +113,6 @@ class EventConfigurationOut(BaseModel):
     max_presale_tickets: int
     max_sale_tickets: int
     map_visibility_policy: str
-
-    model_config = {"from_attributes": True}
 
 
 @router.put("/{event_id}/configuration", response_model=EventConfigurationOut)
@@ -139,18 +137,16 @@ def put_configuration(
     return cfg
 
 
-class LayoutBindingCreate(BaseModel):
+class LayoutBindingCreate(CamelModel):
     layout_id: UUID
     layout_version: int = Field(ge=1)
 
 
-class LayoutBindingOut(BaseModel):
+class LayoutBindingOut(CamelOrmModel):
     id: UUID
     event_id: UUID
     layout_id: UUID
     layout_version: int
-
-    model_config = {"from_attributes": True}
 
 
 @router.post("/{event_id}/layout-binding", response_model=LayoutBindingOut)

@@ -1,7 +1,9 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,21 +24,19 @@ def _ensure_tenant_staff(db: Session, staff_id: UUID, tenant_id: UUID) -> None:
         raise HTTPException(status_code=403, detail="Not allowed for this tenant")
 
 
-class VenueCreate(BaseModel):
+class VenueCreate(CamelModel):
     tenant_id: UUID
     name: str = Field(max_length=200)
     address: str | None = None
     default_timezone: str = Field(default="UTC", max_length=64)
 
 
-class VenueOut(BaseModel):
+class VenueOut(CamelOrmModel):
     id: UUID
     tenant_id: UUID
     name: str
     address: str | None
     default_timezone: str
-
-    model_config = {"from_attributes": True}
 
 
 @router.get("", response_model=list[VenueOut])
@@ -65,19 +65,17 @@ def create_venue(body: VenueCreate, db: DbSession, staff: StaffUserDep) -> Venue
     return v
 
 
-class LayoutCreate(BaseModel):
+class LayoutCreate(CamelModel):
     name: str = Field(max_length=200)
     status: str = Field(default="DRAFT", max_length=32)
 
 
-class LayoutOut(BaseModel):
+class LayoutOut(CamelOrmModel):
     id: UUID
     venue_id: UUID
     name: str
     status: str
     version: int
-
-    model_config = {"from_attributes": True}
 
 
 @router.get("/{venue_id}/layouts", response_model=list[LayoutOut])

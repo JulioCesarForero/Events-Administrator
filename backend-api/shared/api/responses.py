@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class ProblemDetail(BaseModel):
-    """RFC 7807-style problem response."""
+    """RFC 7807-style problem response with contract error codes."""
 
     type: str = Field(default="about:blank")
     title: str
@@ -12,6 +12,9 @@ class ProblemDetail(BaseModel):
     status: int
     instance: str | None = None
     code: str | None = None
+    correlation_id: str | None = Field(default=None, alias="correlationId")
+
+    model_config = {"populate_by_name": True}
 
 
 def problem_response(
@@ -22,6 +25,7 @@ def problem_response(
     type_uri: str = "about:blank",
     instance: str | None = None,
     code: str | None = None,
+    correlation_id: str | None = None,
 ) -> dict[str, Any]:
     body = ProblemDetail(
         type=type_uri,
@@ -30,5 +34,6 @@ def problem_response(
         status=status,
         instance=instance,
         code=code,
+        correlation_id=correlation_id,
     )
-    return body.model_dump(exclude_none=True)
+    return body.model_dump(exclude_none=True, by_alias=True)

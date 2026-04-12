@@ -1,20 +1,31 @@
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
 
+from domain.error_codes import (
+    MISSING_PAYMENT_EVIDENCE,
+    PARTICIPANTS_INCOMPLETE,
+    PAYMENT_ALREADY_REVIEWED,
+    PAYMENT_INVALID_STATE,
+    PAYMENT_NOT_APPROVED,
+    STAGE_LIMIT_EXCEEDED,
+)
 from domain.exceptions import ConflictError, ValidationError
 from infrastructure.persistence.audit import append_audit_log
 from infrastructure.persistence.models import (
     AttendeeGroup,
     Event,
+    EventConfiguration,
+    Participant,
     Payment,
     PaymentEvidence,
 )
 from shared.api.deps import BuyerClaimsDep, DbSession, StaffUserDep, buyer_group_id, ensure_event_staff_access
-from shared.exceptions.http_map import domain_error_to_http
 
 router = APIRouter(tags=["payments"])
 
@@ -28,22 +39,43 @@ def _buyer_group(db, claims, group_id: UUID) -> AttendeeGroup:
     return g
 
 
-class PaymentCreate(BaseModel):
+class PaymentCreate(CamelModel):
     payment_type: str = Field(max_length=16)
     ticket_quantity: int = Field(ge=1)
     amount_cents: int | None = None
     currency: str = Field(default="COP", max_length=3)
 
 
-class PaymentOut(BaseModel):
+class PaymentOut(CamelOrmModel):
     id: UUID
     event_id: UUID
     attendee_group_id: UUID
     status: str
     ticket_quantity: int
     payment_type: str
+    rejection_reason: str | None = None
 
-    model_config = {"from_attributes": True}
+
+def _check_stage_limit(db, event_id: UUID, requested_tickets: int) -> None:
+    """Enforce RN-TIME-02/03: presale max 4, general max 3 tickets per group."""
+    cfg = db.execute(
+        select(EventConfiguration).where(EventConfiguration.event_id == event_id)
+    ).scalar_one_or_none()
+    if cfg is None:
+        return
+    now = datetime.now(UTC)
+    if cfg.presale_start_date <= now <= cfg.presale_end_date:
+        if requested_tickets > cfg.max_presale_tickets:
+            raise ValidationError(
+                f"Presale allows at most {cfg.max_presale_tickets} tickets",
+                code=STAGE_LIMIT_EXCEEDED,
+            )
+    elif cfg.sale_start_date <= now <= cfg.sale_end_date:
+        if requested_tickets > cfg.max_sale_tickets:
+            raise ValidationError(
+                f"General sale allows at most {cfg.max_sale_tickets} tickets",
+                code=STAGE_LIMIT_EXCEEDED,
+            )
 
 
 @router.post("/groups/{group_id}/payments", response_model=PaymentOut)
@@ -54,6 +86,7 @@ def create_payment(
     claims: BuyerClaimsDep,
 ) -> Payment:
     g = _buyer_group(db, claims, group_id)
+    _check_stage_limit(db, g.event_id, body.ticket_quantity)
     pay = Payment(
         event_id=g.event_id,
         attendee_group_id=group_id,
@@ -69,7 +102,7 @@ def create_payment(
     return pay
 
 
-class PaymentPatch(BaseModel):
+class PaymentPatch(CamelModel):
     ticket_quantity: int | None = Field(default=None, ge=1)
     amount_cents: int | None = None
     currency: str | None = Field(default=None, max_length=3)
@@ -86,11 +119,13 @@ def patch_payment(
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     _buyer_group(db, claims, p.attendee_group_id)
-    if p.status != "DRAFT":
-        try:
-            raise ConflictError("Payment cannot be edited in current status")
-        except ConflictError as e:
-            raise domain_error_to_http(e) from e
+    if p.status not in ("DRAFT", "REJECTED"):
+        raise ConflictError("Payment cannot be edited in current status", code=PAYMENT_INVALID_STATE)
+    if p.status == "REJECTED":
+        p.status = "DRAFT"
+        p.rejected_at = None
+        p.rejection_reason = None
+        p.reviewed_by_user_id = None
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
     db.flush()
@@ -106,12 +141,29 @@ def submit_payment(
     p = db.get(Payment, payment_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
-    _buyer_group(db, claims, p.attendee_group_id)
+    g = _buyer_group(db, claims, p.attendee_group_id)
     if p.status != "DRAFT":
-        try:
-            raise ConflictError("Invalid payment state")
-        except ConflictError as e:
-            raise domain_error_to_http(e) from e
+        raise ConflictError("Invalid payment state", code=PAYMENT_INVALID_STATE)
+
+    participant_count = db.execute(
+        select(Participant).where(Participant.attendee_group_id == g.id)
+    ).scalars().all()
+    if len(participant_count) < p.ticket_quantity:
+        raise ValidationError(
+            f"All {p.ticket_quantity} participants must be registered before submitting payment",
+            code=PARTICIPANTS_INCOMPLETE,
+        )
+
+    if p.payment_type == "DIGITAL":
+        evidence = db.execute(
+            select(PaymentEvidence).where(PaymentEvidence.payment_id == payment_id)
+        ).scalars().first()
+        if evidence is None:
+            raise ValidationError(
+                "Digital payment requires evidence before submission",
+                code=MISSING_PAYMENT_EVIDENCE,
+            )
+
     p.status = "PENDING_APPROVAL"
     p.submitted_at = datetime.now(UTC)
     db.flush()
@@ -135,27 +187,31 @@ def payment_inbox(
     )
 
 
+class ApproveBody(CamelModel):
+    approved_ticket_count: int | None = None
+
+
 @router.post("/payments/{payment_id}/approve", response_model=PaymentOut)
 def approve_payment(
     payment_id: UUID,
     db: DbSession,
     staff: StaffUserDep,
+    body: ApproveBody | None = None,
 ) -> Payment:
     p = db.get(Payment, payment_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     ensure_event_staff_access(db, staff, p.event_id)
     if p.status != "PENDING_APPROVAL":
-        try:
-            raise ConflictError("Payment is not pending approval")
-        except ConflictError as e:
-            raise domain_error_to_http(e) from e
+        raise ConflictError("Payment is not pending approval", code=PAYMENT_ALREADY_REVIEWED)
+    approved_count = (body.approved_ticket_count if body and body.approved_ticket_count else p.ticket_quantity)
     p.status = "APPROVED"
+    p.ticket_quantity = approved_count
     p.approved_at = datetime.now(UTC)
     p.reviewed_by_user_id = staff.id
     g = db.get(AttendeeGroup, p.attendee_group_id)
     if g:
-        g.approved_ticket_count = p.ticket_quantity
+        g.approved_ticket_count = approved_count
     ev = db.get(Event, p.event_id)
     append_audit_log(
         db,
@@ -171,7 +227,7 @@ def approve_payment(
     return p
 
 
-class RejectBody(BaseModel):
+class RejectBody(CamelModel):
     reason: str | None = None
 
 
@@ -187,10 +243,7 @@ def reject_payment(
         raise HTTPException(status_code=404, detail="Payment not found")
     ensure_event_staff_access(db, staff, p.event_id)
     if p.status != "PENDING_APPROVAL":
-        try:
-            raise ConflictError("Payment is not pending approval")
-        except ConflictError as e:
-            raise domain_error_to_http(e) from e
+        raise ConflictError("Payment is not pending approval", code=PAYMENT_ALREADY_REVIEWED)
     p.status = "REJECTED"
     p.rejected_at = datetime.now(UTC)
     p.reviewed_by_user_id = staff.id
@@ -199,11 +252,12 @@ def reject_payment(
     return p
 
 
-class CashPaymentCreate(BaseModel):
+class CashPaymentCreate(CamelModel):
     attendee_group_id: UUID
     ticket_quantity: int = Field(ge=1)
     amount_cents: int | None = None
     currency: str = Field(default="COP", max_length=3)
+    receipt_file_url: str | None = None
 
 
 @router.post("/events/{event_id}/cash-payments", response_model=PaymentOut)
@@ -221,23 +275,41 @@ def create_cash_payment(
         event_id=event_id,
         attendee_group_id=body.attendee_group_id,
         payment_type="CASH",
-        status="APPROVED",
+        status="PENDING_APPROVAL",
         ticket_quantity=body.ticket_quantity,
         amount_cents=body.amount_cents,
         currency=body.currency,
-        approved_at=datetime.now(UTC),
-        reviewed_by_user_id=staff.id,
+        submitted_at=datetime.now(UTC),
     )
     db.add(pay)
+    db.flush()
+    if body.receipt_file_url:
+        db.add(
+            PaymentEvidence(
+                payment_id=pay.id,
+                file_url=body.receipt_file_url,
+                evidence_type="CASH_RECEIPT",
+                uploaded_by_actor_type="STAFF",
+            )
+        )
     g.current_payment_id = pay.id
-    g.approved_ticket_count = body.ticket_quantity
+    ev = db.get(Event, event_id)
+    append_audit_log(
+        db,
+        tenant_id=ev.tenant_id if ev else None,
+        event_id=event_id,
+        actor_user_id=staff.id,
+        actor_type="STAFF",
+        entity_type="payment",
+        entity_id=pay.id,
+        action="CASH_PAYMENT_CREATED",
+    )
     db.flush()
     return pay
 
 
-class EvidenceUrlResponse(BaseModel):
+class EvidenceUrlResponse(CamelModel):
     upload_url: str
-    note: str = "Placeholder until object storage is integrated"
 
 
 @router.post("/payments/{payment_id}/evidence-upload-url", response_model=EvidenceUrlResponse)
@@ -246,14 +318,20 @@ def evidence_upload_url(
     db: DbSession,
     claims: BuyerClaimsDep,
 ) -> EvidenceUrlResponse:
+    from infrastructure.storage.signed_urls import generate_upload_url
+
     p = db.get(Payment, payment_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     _buyer_group(db, claims, p.attendee_group_id)
-    return EvidenceUrlResponse(upload_url=f"https://storage.placeholder.local/{payment_id}")
+    url = generate_upload_url(
+        bucket="payment-evidence",
+        object_key=f"{p.event_id}/{payment_id}/{uuid4().hex}",
+    )
+    return EvidenceUrlResponse(upload_url=url)
 
 
-class EvidenceRegister(BaseModel):
+class EvidenceRegister(CamelModel):
     file_url: str
     mime_type: str | None = None
     evidence_type: str = Field(default="RECEIPT", max_length=64)

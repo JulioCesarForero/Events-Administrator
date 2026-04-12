@@ -1,28 +1,35 @@
 from uuid import UUID
 
-from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException
+from pydantic import Field
+
+from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
 
+from domain.error_codes import INVALID_PAYLOAD
+from domain.exceptions import ValidationError
 from infrastructure.persistence.models import StudentImportBatch, StudentRecord
 from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
+
+REQUIRED_IMPORT_COLUMNS = {"codigo_unico", "apellidos", "nombres"}
 
 router = APIRouter(tags=["import"])
 
 
-class StudentRow(BaseModel):
+class StudentRow(CamelModel):
     student_code: str = Field(max_length=128)
     first_name: str = Field(max_length=200)
     last_name: str = Field(max_length=200)
 
 
-class ImportCreateRequest(BaseModel):
+class ImportCreateRequest(CamelModel):
     file_name: str = Field(max_length=500)
     file_url: str | None = None
+    expected_columns: list[str] | None = None
     rows: list[StudentRow] | None = None
 
 
-class ImportCreateResponse(BaseModel):
+class ImportCreateResponse(CamelModel):
     batch_id: UUID
     status: str
 
@@ -35,6 +42,13 @@ def create_import(
     staff: StaffUserDep,
 ) -> ImportCreateResponse:
     ensure_event_staff_access(db, staff, event_id)
+    if body.expected_columns is not None:
+        provided = {c.strip().lower() for c in body.expected_columns}
+        if provided != REQUIRED_IMPORT_COLUMNS:
+            raise ValidationError(
+                f"Import file must contain exactly columns: {sorted(REQUIRED_IMPORT_COLUMNS)}",
+                code=INVALID_PAYLOAD,
+            )
     batch = StudentImportBatch(
         event_id=event_id,
         uploaded_by_user_id=staff.id,
@@ -68,8 +82,8 @@ def create_import(
     return ImportCreateResponse(batch_id=batch.id, status=batch.status)
 
 
-class ImportStatusOut(BaseModel):
-    batch_id: UUID
+class ImportStatusOut(CamelOrmModel):
+    batch_id: UUID = Field(validation_alias="id")
     status: str
     total_rows: int
     imported_rows: int

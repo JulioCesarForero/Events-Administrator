@@ -1,7 +1,9 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -31,7 +33,7 @@ def _layout_tenant(db: Session, layout_id: UUID) -> UUID:
     return venue.tenant_id
 
 
-class TableCreate(BaseModel):
+class TableCreate(CamelModel):
     code: str = Field(max_length=64)
     table_capacity_limit: int = Field(default=10, ge=1)
     zone_id: UUID | None = None
@@ -39,15 +41,13 @@ class TableCreate(BaseModel):
     is_public_selectable: bool = True
 
 
-class TableOut(BaseModel):
+class TableOut(CamelOrmModel):
     id: UUID
     layout_id: UUID
     code: str
     table_capacity_limit: int
     current_occupied_spots: int
     zone_id: UUID | None
-
-    model_config = {"from_attributes": True}
 
 
 @router.get("/{layout_id}/tables", response_model=list[TableOut])

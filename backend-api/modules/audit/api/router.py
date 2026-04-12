@@ -3,7 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from shared.api.schemas import CamelOrmModel
 from sqlalchemy import select
 
 from infrastructure.persistence.models import AuditLog
@@ -12,7 +12,7 @@ from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
 router = APIRouter(tags=["audit"])
 
 
-class AuditLogOut(BaseModel):
+class AuditLogOut(CamelOrmModel):
     id: UUID
     occurred_at: datetime
     actor_type: str
@@ -20,8 +20,6 @@ class AuditLogOut(BaseModel):
     entity_id: UUID | None
     action: str
     payload_json: dict[str, Any] | None
-
-    model_config = {"from_attributes": True}
 
 
 @router.get("/events/{event_id}/audit-log", response_model=list[AuditLogOut])

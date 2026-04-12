@@ -21,3 +21,7 @@ class ValidationError(DomainError):
 
 class ForbiddenError(DomainError):
     pass
+
+
+class AuthenticationError(DomainError):
+    pass

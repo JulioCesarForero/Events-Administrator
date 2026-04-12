@@ -5,7 +5,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from domain.exceptions import NotFoundError, ValidationError
+from domain.error_codes import NOT_FOUND, UNAUTHENTICATED
+from domain.exceptions import AuthenticationError, NotFoundError
 from infrastructure.persistence.models import AttendeeGroup, StaffUser, StudentRecord
 from infrastructure.security.jwt_tokens import create_buyer_token, create_staff_token
 from infrastructure.security.password import verify_password
@@ -21,7 +22,7 @@ class StaffLoginResult:
 def staff_login(db: Session, email: str, password: str) -> StaffLoginResult:
     user = db.execute(select(StaffUser).where(StaffUser.email == email)).scalar_one_or_none()
     if user is None or not verify_password(password, user.password_hash):
-        raise ValidationError("Invalid credentials")
+        raise AuthenticationError("Invalid credentials", code=UNAUTHENTICATED)
     token = create_staff_token(user_id=user.id, email=user.email)
     return StaffLoginResult(access_token=token, user_id=user.id, email=user.email)
 
@@ -45,7 +46,7 @@ def code_login(db: Session, event_id: UUID, student_code: str) -> CodeLoginResul
         )
     ).scalar_one_or_none()
     if rec is None:
-        raise NotFoundError("Student code not found for this event")
+        raise NotFoundError("Student code not found for this event", code=NOT_FOUND)
 
     group = db.execute(
         select(AttendeeGroup).where(

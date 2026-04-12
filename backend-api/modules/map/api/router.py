@@ -2,7 +2,7 @@ from uuid import UUID
 
 import jwt
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from shared.api.schemas import CamelModel
 from sqlalchemy import select
 
 from config.settings import settings
@@ -20,13 +20,20 @@ from shared.api.deps import DbSession, ensure_event_staff_access
 router = APIRouter(tags=["map"])
 
 
-class MapTableOut(BaseModel):
+class MapTableOut(CamelModel):
     layout_table_id: UUID
     code: str
     capacity: int
     occupied: int
     available: int
+    status: str
     position_json: dict | None
+
+
+class MapEnvelope(CamelModel):
+    event_id: UUID
+    layout_id: UUID
+    tables: list[MapTableOut]
 
 
 def _latest_binding(db, event_id: UUID) -> EventLayoutBinding:
@@ -41,26 +48,36 @@ def _latest_binding(db, event_id: UUID) -> EventLayoutBinding:
     return b
 
 
+def _table_status(capacity: int, occupied: int) -> str:
+    available = capacity - occupied
+    if available <= 0:
+        return "FULL"
+    if available <= capacity * 0.2:
+        return "LIMITED"
+    return "AVAILABLE"
+
+
 def _map_tables(db, layout_id: UUID) -> list[MapTableOut]:
     rows = db.execute(select(LayoutTable).where(LayoutTable.layout_id == layout_id)).scalars()
     out: list[MapTableOut] = []
     for t in rows:
-        avail = t.table_capacity_limit - t.current_occupied_spots
+        avail = max(0, t.table_capacity_limit - t.current_occupied_spots)
         out.append(
             MapTableOut(
                 layout_table_id=t.id,
                 code=t.code,
                 capacity=t.table_capacity_limit,
                 occupied=t.current_occupied_spots,
-                available=max(0, avail),
+                available=avail,
+                status=_table_status(t.table_capacity_limit, t.current_occupied_spots),
                 position_json=t.position_json,
             )
         )
     return out
 
 
-@router.get("/events/{event_id}/map", response_model=list[MapTableOut])
-def get_event_map(event_id: UUID, request: Request, db: DbSession) -> list[MapTableOut]:
+@router.get("/events/{event_id}/map", response_model=MapEnvelope)
+def get_event_map(event_id: UUID, request: Request, db: DbSession) -> MapEnvelope:
     auth = request.headers.get("authorization")
     if not auth or not auth.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -98,13 +115,19 @@ def get_event_map(event_id: UUID, request: Request, db: DbSession) -> list[MapTa
         ).scalar_one_or_none()
         policy = cfg.map_visibility_policy if cfg else "AFTER_PAYMENT_APPROVED"
         if policy == "AFTER_PAYMENT_APPROVED":
+            from domain.error_codes import PAYMENT_NOT_APPROVED
+            from domain.exceptions import ValidationError as DomainValidation
             if g.current_payment_id is None:
-                raise HTTPException(status_code=403, detail="Map not visible yet")
+                raise DomainValidation("Map not visible until payment is approved", code=PAYMENT_NOT_APPROVED)
             pay = db.get(Payment, g.current_payment_id)
             if pay is None or pay.status != "APPROVED":
-                raise HTTPException(
-                    status_code=403, detail="Map not visible until payment approved"
+                raise DomainValidation(
+                    "Map not visible until payment is approved", code=PAYMENT_NOT_APPROVED
                 )
         layout_id = _latest_binding(db, event_id).layout_id
 
-    return _map_tables(db, layout_id)
+    return MapEnvelope(
+        event_id=event_id,
+        layout_id=layout_id,
+        tables=_map_tables(db, layout_id),
+    )

@@ -1,38 +1,38 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import EmailStr, Field
+
+from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy.orm import Session
 
 from config.settings import settings
-from domain.exceptions import DomainError
 from infrastructure.persistence.models import StaffUser, UserTenantMembership
 from infrastructure.security.password import hash_password
 from modules.auth.application.auth_service import code_login, staff_login
 from shared.api.deps import DbSession
-from shared.exceptions.http_map import domain_error_to_http
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-class StaffLoginRequest(BaseModel):
+class StaffLoginRequest(CamelModel):
     email: EmailStr
     password: str = Field(min_length=1)
 
 
-class StaffLoginResponse(BaseModel):
+class StaffLoginResponse(CamelModel):
     access_token: str
     token_type: str = "bearer"
     user_id: UUID
     email: str
 
 
-class CodeLoginRequest(BaseModel):
+class CodeLoginRequest(CamelModel):
     event_id: UUID
     student_code: str = Field(min_length=1, max_length=128)
 
 
-class CodeLoginResponse(BaseModel):
+class CodeLoginResponse(CamelModel):
     session_token: str
     event_id: UUID
     group_id: UUID
@@ -43,10 +43,7 @@ class CodeLoginResponse(BaseModel):
 
 @router.post("/staff-login", response_model=StaffLoginResponse)
 def post_staff_login(body: StaffLoginRequest, db: DbSession) -> StaffLoginResponse:
-    try:
-        r = staff_login(db, body.email, body.password)
-    except DomainError as e:
-        raise domain_error_to_http(e) from e
+    r = staff_login(db, body.email, body.password)
     return StaffLoginResponse(
         access_token=r.access_token,
         user_id=r.user_id,
@@ -56,10 +53,7 @@ def post_staff_login(body: StaffLoginRequest, db: DbSession) -> StaffLoginRespon
 
 @router.post("/code-login", response_model=CodeLoginResponse)
 def post_code_login(body: CodeLoginRequest, db: DbSession) -> CodeLoginResponse:
-    try:
-        r = code_login(db, body.event_id, body.student_code)
-    except DomainError as e:
-        raise domain_error_to_http(e) from e
+    r = code_login(db, body.event_id, body.student_code)
     return CodeLoginResponse(
         session_token=r.access_token,
         event_id=r.event_id,
@@ -70,7 +64,7 @@ def post_code_login(body: CodeLoginRequest, db: DbSession) -> CodeLoginResponse:
     )
 
 
-class StaffRegisterRequest(BaseModel):
+class StaffRegisterRequest(CamelModel):
     email: EmailStr
     password: str = Field(min_length=8)
     display_name: str = Field(min_length=1, max_length=200)

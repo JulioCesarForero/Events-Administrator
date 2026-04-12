@@ -5,7 +5,7 @@ Plantilla base empresarial para el MVP de gestion de ubicaciones y reservas de c
 ## Stack base
 
 - Frontend: React + TypeScript + Vite
-- Backend: FastAPI + SQLAlchemy + Alembic
+- Backend: FastAPI + SQLAlchemy
 - Base de datos: PostgreSQL
 - Reverse proxy: Nginx
 - Contenedores: Docker + Docker Compose
@@ -13,12 +13,12 @@ Plantilla base empresarial para el MVP de gestion de ubicaciones y reservas de c
 
 ## Estructura principal
 
-- `data-model`: scripts SQL, migraciones y convenciones de base de datos
-- `frontend`: aplicacion SPA React
+- `data-model`: scripts SQL (baseline DDL) y convenciones de base de datos
+- `frontend`: aplicacion SPA React (scaffold, sin codigo fuente aún)
 - `backend-api`: API FastAPI por capas
 - `nginx`: configuracion de reverse proxy
 - `docker`: Dockerfiles y compose por entorno
-- `cicd`: pipelines y plantillas de automatizacion
+- `cicd`: plantillas de referencia (copias activas en `.github/workflows/`)
 - `docs`: arquitectura, runbooks y onboarding
 
 ## Quick start local (Docker)
