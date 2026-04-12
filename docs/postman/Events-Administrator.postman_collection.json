@@ -59,6 +59,38 @@
           }
         },
         {
+          "name": "POST Staff Register (debug only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('staffToken', json.accessToken);",
+                  "if (json.tenantId) pm.collectionVariables.set('tenantId', json.tenantId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/auth/staff-register" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"email\": \"nuevo@demo.local\", \"password\": \"Admin123!\", \"displayName\": \"Nuevo Admin\" }"
+            }
+          }
+        },
+        {
+          "name": "GET Staff Me",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/auth/me" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
           "name": "POST Code Login",
           "event": [
             {

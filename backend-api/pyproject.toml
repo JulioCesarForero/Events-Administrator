@@ -22,5 +22,5 @@ disallow_untyped_defs = false
 plugins = []
 
 [[tool.mypy.overrides]]
-module = ["passlib.*", "jose.*"]
+module = ["jose.*"]
 ignore_missing_imports = true

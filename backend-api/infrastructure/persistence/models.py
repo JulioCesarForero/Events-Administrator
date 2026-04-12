@@ -33,7 +33,7 @@ class Tenant(Base):
     __tablename__ = "tenant"
     __table_args__ = (
         UniqueConstraint("slug", name="uq_tenant_slug"),
-        CheckConstraint("status IN ('ACTIVE','INACTIVE')", name="ck_tenant_status"),
+        CheckConstraint("status IN ('ACTIVE','SUSPENDED','ARCHIVED')", name="ck_tenant_status"),
         SCHEMA,
     )
 
@@ -52,7 +52,7 @@ class StaffUser(Base):
     __tablename__ = "staff_user"
     __table_args__ = (
         UniqueConstraint("email", name="uq_staff_user_email"),
-        CheckConstraint("status IN ('ACTIVE','INACTIVE')", name="ck_staff_user_status"),
+        CheckConstraint("status IN ('ACTIVE','INVITED','DISABLED')", name="ck_staff_user_status"),
         SCHEMA,
     )
 
@@ -140,9 +140,11 @@ class LayoutTable(Base):
     __tablename__ = "layout_table"
     __table_args__ = (
         UniqueConstraint("layout_id", "code", name="uq_layout_table_layout_code"),
-        CheckConstraint("table_capacity_limit >= 1", name="ck_lt_capacity_min"),
-        CheckConstraint("current_occupied_spots >= 0", name="ck_lt_occupied_min"),
-        CheckConstraint("current_occupied_spots <= table_capacity_limit", name="ck_lt_occupied_max"),
+        CheckConstraint("table_capacity_limit > 0", name="ck_layout_table_capacity"),
+        CheckConstraint(
+            "current_occupied_spots >= 0 AND current_occupied_spots <= table_capacity_limit",
+            name="ck_layout_table_occupied",
+        ),
         SCHEMA,
     )
 
@@ -168,7 +170,7 @@ class LayoutTable(Base):
 class Event(Base):
     __tablename__ = "event"
     __table_args__ = (
-        CheckConstraint("status IN ('DRAFT','OPEN','CLOSED','CANCELLED')", name="ck_event_status"),
+        CheckConstraint("status IN ('DRAFT','PREPARING','OPEN','CLOSED','ARCHIVED')", name="ck_event_status"),
         SCHEMA,
     )
 
@@ -245,7 +247,7 @@ class EventPolicyDocument(Base):
     __tablename__ = "event_policy_document"
     __table_args__ = (
         UniqueConstraint("event_id", "document_type", "version_label", name="uq_policy_event_type_version"),
-        CheckConstraint("status IN ('DRAFT','PUBLISHED')", name="ck_policy_status"),
+        CheckConstraint("status IN ('DRAFT','PUBLISHED','ARCHIVED')", name="ck_policy_status"),
         CheckConstraint("document_type IN ('DATA_POLICY','EVENT_TERMS')", name="ck_policy_type"),
         SCHEMA,
     )
@@ -361,7 +363,7 @@ class AttendeeGroup(Base):
     __table_args__ = (
         UniqueConstraint("event_id", "student_record_id", name="uq_attendee_group_event_student_record"),
         CheckConstraint(
-            "reservation_status IN ('NONE','CONFIRMED','RELEASED')",
+            "reservation_status IN ('NONE','PENDING','CONFIRMED','RELEASED','ADJUSTED')",
             name="ck_ag_reservation_status",
         ),
         SCHEMA,
@@ -423,7 +425,7 @@ class Payment(Base):
             name="ck_payment_status",
         ),
         CheckConstraint("payment_type IN ('DIGITAL','CASH')", name="ck_payment_type"),
-        CheckConstraint("ticket_quantity >= 1", name="ck_payment_qty"),
+        CheckConstraint("ticket_quantity > 0", name="ck_payment_ticket_qty"),
         SCHEMA,
     )
 
@@ -475,7 +477,7 @@ class PaymentEvidence(Base):
 class Reservation(Base):
     __tablename__ = "reservation"
     __table_args__ = (
-        CheckConstraint("status IN ('CONFIRMED','RELEASED','MOVED')", name="ck_reservation_status"),
+        CheckConstraint("status IN ('CONFIRMED','RELEASED','ADJUSTED')", name="ck_reservation_status"),
         SCHEMA,
     )
 
@@ -505,7 +507,7 @@ class TableReservation(Base):
     __tablename__ = "table_reservation"
     __table_args__ = (
         CheckConstraint("status IN ('ACTIVE','RELEASED','MOVED')", name="ck_tr_status"),
-        CheckConstraint("spots_reserved >= 1", name="ck_tr_spots_min"),
+        CheckConstraint("spots_reserved > 0", name="ck_tr_spots"),
         SCHEMA,
     )
 
