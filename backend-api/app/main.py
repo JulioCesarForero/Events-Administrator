@@ -20,6 +20,7 @@ from modules.map.api.router import router as map_router
 from modules.operations.api.router import router as operations_router
 from modules.payments.api.router import router as payments_router
 from modules.reservations.api.router import router as reservations_router
+from modules.students.api.router import router as students_router
 from modules.venues.api.router import router as venues_router
 from modules.venues.api.tables_router import router as layout_tables_router
 from shared.api.responses import problem_response
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     v1.include_router(events_router)
     v1.include_router(legal_router)
     v1.include_router(import_router)
+    v1.include_router(students_router)
     v1.include_router(attendees_router)
     v1.include_router(payments_router)
     v1.include_router(map_router)

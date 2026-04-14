@@ -15,6 +15,7 @@
     { "key": "layoutId", "value": "", "description": "Layout UUID" },
     { "key": "paymentId", "value": "", "description": "Payment UUID" },
     { "key": "reservationId", "value": "", "description": "Reservation UUID" },
+    { "key": "studentId", "value": "", "description": "StudentRecord UUID" },
     { "key": "policyDocId", "value": "", "description": "Policy document UUID" },
     { "key": "termsDocId", "value": "", "description": "Terms document UUID" }
   ],
@@ -184,6 +185,58 @@
               "mode": "raw",
               "raw": "{ \"timezone\": \"America/Bogota\", \"presaleStartDate\": \"2026-10-01T00:00:00Z\", \"presaleEndDate\": \"2026-11-01T00:00:00Z\", \"saleStartDate\": \"2026-11-01T00:00:00Z\", \"saleEndDate\": \"2026-12-14T23:59:59Z\", \"maxPresaleTickets\": 4, \"maxSaleTickets\": 3 }"
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Students",
+      "item": [
+        {
+          "name": "GET List Students",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/students?limit=50&offset=0" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
+          "name": "GET List Students (search)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/students?search=perez" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
+          "name": "GET Student by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/students/{{studentId}}" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
+          }
+        },
+        {
+          "name": "PATCH Update Student",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/students/{{studentId}}" },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"firstName\": \"Juan Carlos\", \"isActive\": true }"
+            }
+          }
+        },
+        {
+          "name": "DELETE Student",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/v1/events/{{eventId}}/students/{{studentId}}" },
+            "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }]
           }
         }
       ]

@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Fondo Oscuro / Premium Dark Mode */
+  --bg-dark: #0a0a0c;
+  --bg-card: rgba(25, 25, 30, 0.6);
+  --bg-card-hover: rgba(35, 35, 42, 0.7);
+  
+  /* Textos */
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0ab;
+  --text-muted: #5f5f68;
+
+  /* Bordes */
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(255, 255, 255, 0.2);
+
+  /* Tema por Defecto: Verde Neón */
+  --accent-primary: #39ff14;
+  --accent-primary-dim: rgba(57, 255, 20, 0.15);
+  --accent-primary-hover: #32e011;
+  
+  /* Sistema */
+  --error: #ff3366;
+  --error-dim: rgba(255, 51, 102, 0.15);
+  --success: #00e676;
+  --warning: #ffea00;
+  
+  /* Radios */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* Sombras */
+  --shadow-neon: 0 0 15px var(--accent-primary-dim);
+
+  /* Tipografía */
+  --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
+}
+
+/* Selector dinámico de temas */
+body.theme-neon-green {
+  --accent-primary: #39ff14;
+  --accent-primary-dim: rgba(57, 255, 20, 0.15);
+  --accent-primary-hover: #32e011;
+}
+
+body.theme-neon-orange {
+  --accent-primary: #ff5e00;
+  --accent-primary-dim: rgba(255, 94, 0, 0.15);
+  --accent-primary-hover: #e05300;
+}
+
+body.theme-vibrant-blue {
+  --accent-primary: #00d4ff;
+  --accent-primary-dim: rgba(0, 212, 255, 0.15);
+  --accent-primary-hover: #00b9e0;
+}
+
+body.theme-purple-neon {
+  --accent-primary: #b500ff;
+  --accent-primary-dim: rgba(181, 0, 255, 0.15);
+  --accent-primary-hover: #9b00db;
+}
