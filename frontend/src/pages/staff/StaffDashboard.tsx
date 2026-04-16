@@ -75,7 +75,7 @@ export const StaffDashboard = () => {
             <p style={{ color: 'var(--text-secondary)' }}>Fecha: {ev.date}</p>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                <Button size="sm" onClick={() => navigate(`/staff/events/${ev.id}/payments`)}>Revisión Pagos</Button>
-               <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/import`)}>Estudiantes</Button>
+               <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/students`)}>Estudiantes</Button>
                <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/map`)}>Ver Mapa</Button>
             </div>
           </GlassCard>

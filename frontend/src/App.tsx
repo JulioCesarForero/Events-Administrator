@@ -8,7 +8,7 @@ import { PortalMap } from './pages/portal/PortalMap';
 import { StaffLogin } from './pages/staff/StaffLogin';
 import { StaffDashboard } from './pages/staff/StaffDashboard';
 import { StaffPayments } from './pages/staff/StaffPayments';
-import { StaffImport } from './pages/staff/StaffImport';
+import { StaffStudents } from './pages/staff/StaffStudents';
 import { StaffPolicies } from './pages/staff/StaffPolicies';
 import { StaffMap } from './pages/staff/StaffMap';
 import { StaffEventWizard } from './pages/staff/StaffEventWizard';
@@ -112,7 +112,7 @@ export default function App() {
               <Route path="dashboard" element={<StaffDashboard />} />
               <Route path="events/:eventId/payments" element={<StaffPayments />} />
               <Route path="events/new" element={<StaffEventWizard />} />
-              <Route path="events/:eventId/import" element={<StaffImport />} />
+              <Route path="events/:eventId/students" element={<StaffStudents />} />
               <Route path="events/:eventId/policies" element={<StaffPolicies />} />
               <Route path="events/:eventId/map" element={<StaffMap />} />
               <Route path="" element={<Navigate to="login" />} />
