@@ -23,7 +23,8 @@ export const PortalAttendees = () => {
     mobilePhone: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
-    hasReducedMobility: false
+    hasReducedMobility: false,
+    hasAllergies: false
   });
 
   const loadAttendees = async () => {
@@ -44,11 +45,12 @@ export const PortalAttendees = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await apiClient.post(`/groups/${session?.groupId}/participants`, formData, { token: session?.sessionToken, isBearer: true });
+      const { hasAllergies, ...payload } = formData;
+      await apiClient.post(`/groups/${session?.groupId}/participants`, payload, { token: session?.sessionToken, isBearer: true });
       setShowForm(false);
       loadAttendees();
-    } catch (err) {
-      alert('Error guardando participante');
+    } catch (err: any) {
+      alert(`Error guardando participante: ${err?.message || JSON.stringify(err)}`);
     } finally {
       setLoading(false);
     }
@@ -88,41 +90,47 @@ export const PortalAttendees = () => {
           <h3>Nuevo Asistente</h3>
           <form style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }} onSubmit={handleAdd}>
             <div style={{ display: 'flex', gap: '16px' }}>
-              <Input label="Nombres" required value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
-              <Input label="Apellidos" required value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+              <Input label="Nombres" required value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
+              <Input label="Apellidos" required value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
             </div>
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Tipo Doc.</label>
-                <select className="glass-input" value={formData.documentType} onChange={e => setFormData({...formData, documentType: e.target.value})}>
+                <select className="glass-input" value={formData.documentType} onChange={e => setFormData({ ...formData, documentType: e.target.value })}>
                   <option value="CC">Cédula (CC)</option>
                   <option value="TI">Tarjeta Identidad (TI)</option>
                   <option value="CE">Cédula Extranjería (CE)</option>
                 </select>
               </div>
-              <Input label="Documento" required type="number" value={formData.documentId} onChange={e => setFormData({...formData, documentId: e.target.value})} />
+              <div style={{ flex: 1 }}>
+                <Input label="Documento" required type="number" value={formData.documentId} onChange={e => setFormData({ ...formData, documentId: e.target.value })} />
+              </div>
             </div>
-            
-            <Input label="Celular" required type="tel" value={formData.mobilePhone} onChange={e => setFormData({...formData, mobilePhone: e.target.value})} />
-            
+
+            <Input label="Celular" required type="tel" value={formData.mobilePhone} onChange={e => setFormData({ ...formData, mobilePhone: e.target.value })} />
+
             <div style={{ display: 'flex', gap: '16px' }}>
-               <Input label="Contacto Emergencia" required value={formData.emergencyContactName} onChange={e => setFormData({...formData, emergencyContactName: e.target.value})} />
-               <Input label="Teléfono Emergencia" required type="tel" value={formData.emergencyContactPhone} onChange={e => setFormData({...formData, emergencyContactPhone: e.target.value})} />
+              <Input label="Contacto Emergencia" required value={formData.emergencyContactName} onChange={e => setFormData({ ...formData, emergencyContactName: e.target.value })} />
+              <Input label="Teléfono Emergencia" required type="tel" value={formData.emergencyContactPhone} onChange={e => setFormData({ ...formData, emergencyContactPhone: e.target.value })} />
             </div>
 
-            <div style={{ display: 'flex', gap: '20px', margin: '16px 0' }}>
-               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={formData.isVegetarian} onChange={e => setFormData({...formData, isVegetarian: e.target.checked})} />
-                  Vegetariano
-               </label>
-               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={formData.hasReducedMobility} onChange={e => setFormData({...formData, hasReducedMobility: e.target.checked})} />
-                  Movilidad Reducida
-               </label>
+            <div style={{ display: 'flex', gap: '20px', margin: '16px 0', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={formData.isVegetarian} onChange={e => setFormData({ ...formData, isVegetarian: e.target.checked })} />
+                Vegetariano
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={formData.hasReducedMobility} onChange={e => setFormData({ ...formData, hasReducedMobility: e.target.checked })} />
+                Movilidad Reducida
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={formData.hasAllergies} onChange={e => setFormData({ ...formData, hasAllergies: e.target.checked, allergies: e.target.checked ? formData.allergies : '' })} />
+                Alergias Alimentarias
+              </label>
             </div>
 
-            {formData.isVegetarian && (
-               <Input label="Alergias Alimentarias" value={formData.allergies} onChange={e => setFormData({...formData, allergies: e.target.value})} />
+            {formData.hasAllergies && (
+              <Input label="¿A qué alimentos es alérgico?" required value={formData.allergies} onChange={e => setFormData({ ...formData, allergies: e.target.value })} />
             )}
 
             <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>

@@ -168,3 +168,10 @@ Guía de colección, variables y criterios P90/P95: [docs/postman.md](docs/postm
 
 - Docker backend-only: [docker/README.md](docker/README.md)
 - Arquitectura: [docs/architecture.md](docs/architecture.md)
+
+
+
+---
+
+
+PS C:\ProyectosIA\Events-Administrator\docker> docker compose -f compose.local.yml --env-file ../.env up --build

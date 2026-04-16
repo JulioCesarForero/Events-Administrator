@@ -73,3 +73,11 @@ export default defineConfig([
   },
 ])
 ```
+
+
+---
+compilar y ejecutar el proyecto en modo desarrollo
+
+C:\ProyectosIA\Events-Administrator\frontend> npm run build
+
+PS C:\ProyectosIA\Events-Administrator\frontend> npm run dev

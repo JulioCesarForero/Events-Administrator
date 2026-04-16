@@ -45,3 +45,12 @@ Solo backend + Postgres: ver [backend-api/docker/README.md](backend-api/docker/R
 ## Documentacion
 
 Ver carpeta `docs` para decisiones de arquitectura, guias operativas y seguridad.
+
+---
+
+este link es de prueba de login para acceder al evento creado y acceder directamente con el codigo de estudiante
+
+http://localhost:5173/portal/143e2e52-19dd-432f-bf84-468be862eed6/login
+
+
+

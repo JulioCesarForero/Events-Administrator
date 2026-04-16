@@ -5,6 +5,7 @@ import { PortalDashboard } from './pages/portal/PortalDashboard';
 import { PortalAttendees } from './pages/portal/PortalAttendees';
 import { PortalPayment } from './pages/portal/PortalPayment';
 import { PortalMap } from './pages/portal/PortalMap';
+import { PortalLanding } from './pages/portal/PortalLanding';
 import { StaffLogin } from './pages/staff/StaffLogin';
 import { StaffDashboard } from './pages/staff/StaffDashboard';
 import { StaffPayments } from './pages/staff/StaffPayments';
@@ -88,7 +89,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/portal" />} />
         
-        <Route path="/portal" element={<Navigate to="/portal/demo-event/login" />} />
+        <Route path="/portal" element={<PortalLayout><PortalLanding /></PortalLayout>} />
         
         {/* Portal Comprador */}
         <Route path="/portal/:eventId/*" element={
