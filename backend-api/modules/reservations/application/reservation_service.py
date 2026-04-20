@@ -58,7 +58,7 @@ def create_reservation(
     if pay.event_id != event_id or pay.attendee_group_id != group_id:
         raise ValidationError("Payment does not belong to this group/event")
     if pay.status != "APPROVED":
-        raise ConflictError("Payment must be approved before reserving", code=PAYMENT_NOT_APPROVED)
+        raise ValidationError("Payment must be approved before reserving", code=PAYMENT_NOT_APPROVED)
 
     total_spots = sum(a.spots for a in allocations)
     if total_spots != pay.ticket_quantity:
@@ -76,7 +76,7 @@ def create_reservation(
     if pol.document_type != DATA_POLICY or terms.document_type != EVENT_TERMS:
         raise ValidationError("Invalid document types for consent")
     if pol.status != "PUBLISHED" or terms.status != "PUBLISHED":
-        raise ConflictError("Policy and terms must be published", code=LEGAL_DOCUMENTS_NOT_PUBLISHED)
+        raise ValidationError("Policy and terms must be published", code=LEGAL_DOCUMENTS_NOT_PUBLISHED)
 
     binding = db.execute(
         select(EventLayoutBinding)

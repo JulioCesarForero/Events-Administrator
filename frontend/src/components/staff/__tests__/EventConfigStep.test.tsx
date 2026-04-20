@@ -11,7 +11,8 @@ vi.mock('lucide-react', () => ({
 
 vi.mock('../../../api/client', () => ({
   apiClient: {
-    post: vi.fn()
+    post: vi.fn(),
+    put: vi.fn(),
   }
 }));
 
@@ -55,14 +56,15 @@ describe('EventConfigStep', () => {
     expect(mockOnPrev).toHaveBeenCalled();
   });
 
-  it('submits 3 post calls and redirects on successful creation', async () => {
+  it('submits 2 POST calls + 1 PUT call and redirects on successful creation', async () => {
     const spyAlert = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
-    // Mock responses for the 3 steps
+    // POST /events and POST /layout-binding
     (apiClient.post as any)
-      .mockResolvedValueOnce({ id: 'new_evt_1', name: 'Graduation 2026' }) // 1. create event
-      .mockResolvedValueOnce({ id: 'binding_id' }) // 2. bind layout
-      .mockResolvedValueOnce({ id: 'config_id' }); // 3. config update
+      .mockResolvedValueOnce({ id: 'new_evt_1', name: 'Graduation 2026' })
+      .mockResolvedValueOnce({ id: 'binding_id' });
+    // PUT /configuration (doc 8 §4.2.1 uses PUT for event configuration)
+    (apiClient.put as any).mockResolvedValueOnce({ id: 'config_id' });
 
     renderWithRouter(<EventConfigStep wizardData={baseWizardData} onPrev={mockOnPrev} sessionToken={sessionToken} />);
 
@@ -78,8 +80,8 @@ describe('EventConfigStep', () => {
     fireEvent.click(screen.getByRole('button', { name: "Crear Evento Oficial" }));
 
     await waitFor(() => {
-      // Debería emitir 3 llamadas POST a /events, binding, y config
-      expect(apiClient.post).toHaveBeenCalledTimes(3);
+      expect(apiClient.post).toHaveBeenCalledTimes(2);
+      expect(apiClient.put).toHaveBeenCalledTimes(1);
     });
 
     expect(spyAlert).toHaveBeenCalledWith('¡Evento creado, publicado y configurado exitosamente!');

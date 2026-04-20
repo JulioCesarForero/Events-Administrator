@@ -1,190 +1,554 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuthPortal } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { apiClient } from '../../api/client';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Minus, Plus, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useIsMobile } from '../../hooks/useMediaQuery';
+
+interface LegalDoc {
+  id: string;
+  documentType: 'DATA_POLICY' | 'EVENT_TERMS' | string;
+  versionLabel: string;
+  title: string;
+  contentMarkdown?: string;
+  status: string;
+  publishedAt?: string | null;
+}
+
+interface MapTable {
+  id?: string;
+  layoutTableId?: string;
+  code: string;
+  capacity: number;
+  occupiedSpots?: number;
+  availableSpots?: number;
+  occupied?: number;
+  available?: number;
+  status?: 'AVAILABLE' | 'LIMITED' | 'FULL' | string;
+  position?: { x?: number; y?: number; rotationDeg?: number };
+  positionJson?: Record<string, unknown> | null;
+}
+
+interface MyGroup {
+  groupId: string;
+  eventId: string;
+  approvedTicketCount: number;
+  reservationStatus: string;
+  currentPaymentId?: string | null;
+}
+
+type ReservedCode = { participantId: string; code: string };
+type ReservedAlloc = { layoutTableId: string; spotsReserved: number; code?: string };
+
+interface ReservationConfirmation {
+  reservationId: string;
+  status: string;
+  reservationCodes: ReservedCode[];
+  allocations: ReservedAlloc[];
+}
+
+function pickLatest(docs: LegalDoc[], type: string): LegalDoc | undefined {
+  return docs
+    .filter((d) => d.documentType === type && d.status === 'PUBLISHED')
+    .sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || ''))[0];
+}
+
+function tableId(t: MapTable): string {
+  return t.id || t.layoutTableId || '';
+}
+
+function tableAvailable(t: MapTable): number {
+  if (typeof t.availableSpots === 'number') return t.availableSpots;
+  if (typeof t.available === 'number') return t.available;
+  return Math.max(0, (t.capacity || 0) - (t.occupiedSpots ?? t.occupied ?? 0));
+}
+
+function tablePosition(t: MapTable): { x: number; y: number } {
+  if (t.position && typeof t.position.x === 'number') {
+    return { x: t.position.x, y: t.position.y ?? 0 };
+  }
+  const pj = (t.positionJson || {}) as { x?: number; y?: number };
+  return { x: Number(pj.x || 0), y: Number(pj.y || 0) };
+}
+
+function semaphoreColor(t: MapTable): { fill: string; border: string; label: string } {
+  const avail = tableAvailable(t);
+  if (avail <= 0) return { fill: 'rgba(255,0,0,0.18)', border: 'var(--error)', label: 'Sin cupos' };
+  const ratio = t.capacity > 0 ? avail / t.capacity : 0;
+  if (ratio <= 0.2)
+    return {
+      fill: 'rgba(255,193,7,0.18)',
+      border: '#FFC107',
+      label: 'Cupos limitados',
+    };
+  return {
+    fill: 'rgba(57,255,20,0.14)',
+    border: 'var(--accent-primary)',
+    label: 'Disponible',
+  };
+}
 
 export const PortalMap = () => {
   const { session } = useAuthPortal();
   const navigate = useNavigate();
-  const [mapData, setMapData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  
-  // Selection state
-  const [selectedTables, setSelectedTables] = useState<Record<string, number>>({});
-  
-  // Modal states
+  const isMobile = useIsMobile();
+
+  const [group, setGroup] = useState<MyGroup | null>(null);
+  const [mapData, setMapData] = useState<{ tables: MapTable[]; layoutId?: string } | null>(null);
+  const [policyDoc, setPolicyDoc] = useState<LegalDoc | undefined>();
+  const [termsDoc, setTermsDoc] = useState<LegalDoc | undefined>();
+  const [loadError, setLoadError] = useState<string>('');
+
+  const [selectedSpots, setSelectedSpots] = useState<Record<string, number>>({});
+
   const [showLegal, setShowLegal] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
-  const [reservationSuccess, setReservationSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string>('');
+
+  const [confirmation, setConfirmation] = useState<ReservationConfirmation | null>(null);
 
   useEffect(() => {
-    if (session) {
-      loadMap();
-    }
+    if (!session) return;
+    const controller = new AbortController();
+    const token = { token: session.sessionToken, isBearer: true, signal: controller.signal };
+
+    const loadAll = async () => {
+      try {
+        const [groupRes, mapRes, legalRes] = await Promise.all([
+          apiClient.get<MyGroup>(`/portal/events/${session.eventId}/my-group`, token),
+          apiClient.get<{ tables: MapTable[]; layoutId?: string }>(
+            `/events/${session.eventId}/map`,
+            token,
+          ),
+          apiClient.get<LegalDoc[]>(
+            `/events/${session.eventId}/legal-documents`,
+            token,
+          ).catch(() => [] as LegalDoc[]),
+        ]);
+        setGroup(groupRes);
+        setMapData(mapRes);
+        setPolicyDoc(pickLatest(legalRes, 'DATA_POLICY'));
+        setTermsDoc(pickLatest(legalRes, 'EVENT_TERMS'));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'No se pudo cargar el mapa';
+        setLoadError(msg);
+      }
+    };
+    loadAll();
+    return () => controller.abort();
   }, [session]);
 
-  const loadMap = async () => {
-    try {
-      const res = await apiClient.get<any>(`/events/${session?.eventId}/map`, { token: session?.sessionToken, isBearer: true });
-      setMapData(res);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  const totalAssigned = useMemo(
+    () => Object.values(selectedSpots).reduce((acc, n) => acc + n, 0),
+    [selectedSpots],
+  );
+  const approved = group?.approvedTicketCount ?? 0;
+  const canConfirm =
+    totalAssigned > 0 && totalAssigned === approved && !!group?.currentPaymentId;
 
-  const handleTableToggle = (tableId: string) => {
-    setSelectedTables(prev => {
+  const setSpots = (tid: string, next: number, maxAvailable: number) => {
+    const remainingBudget = approved - totalAssigned + (selectedSpots[tid] || 0);
+    const clamped = Math.max(0, Math.min(next, maxAvailable, remainingBudget));
+    setSelectedSpots((prev) => {
       const copy = { ...prev };
-      if (copy[tableId]) {
-        delete copy[tableId];
-      } else {
-        // Just pre-allocating 1 spot for simplicity, they could choose via a stepper.
-        copy[tableId] = 1;
-      }
+      if (clamped <= 0) delete copy[tid];
+      else copy[tid] = clamped;
       return copy;
     });
   };
 
   const confirmReservation = async () => {
-    setLoading(true);
+    if (!session || !group?.currentPaymentId || !policyDoc || !termsDoc) {
+      setSubmitError(
+        'Faltan datos para reservar: pago aprobado, política o términos del evento.',
+      );
+      return;
+    }
+    setSubmitError('');
+    setSubmitting(true);
     try {
-      const allocations = Object.entries(selectedTables).map(([tableId, spots]) => ({
-        layoutTableId: tableId,
-        spotsReserved: spots
+      const allocations = Object.entries(selectedSpots).map(([tid, spots]) => ({
+        layoutTableId: tid,
+        spotsReserved: spots,
       }));
 
-      await apiClient.post(`/events/${session?.eventId}/reservations`, {
-        groupId: session?.groupId,
-        paymentId: 'MOCK_PAY_ID', // Reemplazar con el pago real
-        legalAcceptance: {
-          accepted: true,
-          policyDocumentId: 'leg_data',
-          termsDocumentId: 'leg_terms'
+      const result = await apiClient.post<ReservationConfirmation & { id?: string }>(
+        `/events/${session.eventId}/reservations`,
+        {
+          groupId: session.groupId,
+          paymentId: group.currentPaymentId,
+          legalAcceptance: {
+            accepted: true,
+            policyDocumentId: policyDoc.id,
+            termsDocumentId: termsDoc.id,
+          },
+          allocations,
         },
-        allocations
-      }, { token: session?.sessionToken, isBearer: true });
-      
-      setReservationSuccess(true);
+        { token: session.sessionToken, isBearer: true },
+      );
+
+      setConfirmation({
+        reservationId: result.reservationId || (result.id as string),
+        status: result.status,
+        reservationCodes: result.reservationCodes || [],
+        allocations: result.allocations || [],
+      });
       setShowLegal(false);
-    } catch (err) {
-      alert('Error confirmando reserva');
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'No se pudo completar la reserva';
+      setSubmitError(msg);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   if (!session) return null;
 
+  const tables = mapData?.tables || [];
+
   return (
     <div className="animate-slide-up" style={{ maxWidth: '1000px', margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-        <button onClick={() => navigate(`/portal/${session.eventId}/dashboard`)} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}>
+        <button
+          onClick={() => navigate(`/portal/${session.eventId}/dashboard`)}
+          style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
+        >
           <ArrowLeft size={24} />
         </button>
         <h2 style={{ margin: 0 }}>Selección de Mesa</h2>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-        {/* Render Map */}
+      {loadError && (
+        <GlassCard style={{ marginBottom: '16px', borderLeft: '3px solid var(--error)' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <AlertTriangle color="var(--error)" />
+            <div>
+              <strong>No se pudo cargar el mapa</strong>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{loadError}</div>
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile
+            ? 'minmax(0, 1fr)'
+            : 'minmax(0, 2fr) minmax(260px, 1fr)',
+          gap: '24px',
+        }}
+      >
         <GlassCard style={{ minHeight: '500px', position: 'relative', overflow: 'hidden' }}>
-          <h3 style={{ marginBottom: '20px' }}>Layout del Salón</h3>
-          
-          <div style={{ position: 'relative', width: '100%', height: '400px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}>
-            {mapData?.tables?.map((t: any) => (
-              <div 
-                key={t.id}
-                onClick={() => t.availableSpots > 0 && handleTableToggle(t.id)}
-                style={{
-                  position: 'absolute',
-                  left: `${t.position?.x || 0}px`,
-                  top: `${t.position?.y || 0}px`,
-                  width: '60px', height: '60px',
-                  borderRadius: '50%',
-                  background: selectedTables[t.id] ? 'var(--accent-primary)' : (t.availableSpots > 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,0,0,0.2)'),
-                  border: `2px solid ${t.availableSpots > 0 ? 'var(--border-focus)' : 'var(--error)'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: t.availableSpots > 0 ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s',
-                  color: selectedTables[t.id] ? '#000' : 'var(--text-primary)'
-                }}
-              >
-                <span>{t.code}</span>
-              </div>
-            ))}
+          <h3 style={{ marginBottom: '12px' }}>Layout del Salón</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 0 16px' }}>
+            Toca una mesa para asignarle cupos. El total debe coincidir con tus {approved} boletas aprobadas.
+          </p>
+
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              minHeight: '400px',
+              border: '1px solid var(--border-light)',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px',
+            }}
+          >
+            {tables.map((t) => {
+              const tid = tableId(t);
+              const avail = tableAvailable(t);
+              const selected = selectedSpots[tid] || 0;
+              const sem = semaphoreColor(t);
+              const pos = tablePosition(t);
+              return (
+                <div
+                  key={tid}
+                  style={{
+                    position: 'absolute',
+                    left: `${pos.x}px`,
+                    top: `${pos.y}px`,
+                    width: '78px',
+                    padding: '6px 6px 4px',
+                    borderRadius: 'var(--radius-md)',
+                    background: selected > 0 ? 'rgba(57,255,20,0.25)' : sem.fill,
+                    border: `2px solid ${selected > 0 ? 'var(--accent-primary)' : sem.border}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                    textAlign: 'center',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <strong style={{ fontSize: '0.95rem' }}>{t.code}</strong>
+                  <small style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                    {avail}/{t.capacity}
+                  </small>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button
+                      onClick={() => setSpots(tid, (selectedSpots[tid] || 0) - 1, avail)}
+                      disabled={!selected}
+                      aria-label={`Quitar cupo en mesa ${t.code}`}
+                      style={{
+                        border: 'none',
+                        background: 'rgba(255,255,255,0.12)',
+                        color: 'var(--text-primary)',
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        cursor: selected ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <span style={{ minWidth: '14px', textAlign: 'center', fontSize: '0.85rem' }}>
+                      {selected}
+                    </span>
+                    <button
+                      onClick={() => setSpots(tid, (selectedSpots[tid] || 0) + 1, avail)}
+                      disabled={avail <= 0 || totalAssigned >= approved}
+                      aria-label={`Agregar cupo en mesa ${t.code}`}
+                      style={{
+                        border: 'none',
+                        background: 'var(--accent-primary)',
+                        color: '#000',
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        cursor: avail > 0 && totalAssigned < approved ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {tables.length === 0 && !loadError && (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '120px' }}>
+                Cargando mesas...
+              </p>
+            )}
           </div>
         </GlassCard>
 
-        {/* Resumen */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <GlassCard>
-            <h3 style={{ marginBottom: '16px' }}>Tu Selección</h3>
-            {Object.keys(selectedTables).length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)' }}>No has seleccionado ninguna mesa.</p>
+            <h3 style={{ marginBottom: '8px' }}>Tu Selección</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+              Total asignado: <strong>{totalAssigned}</strong> / {approved}
+            </p>
+
+            {Object.keys(selectedSpots).length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', marginTop: '16px' }}>
+                No has seleccionado ninguna mesa.
+              </p>
             ) : (
-              <ul style={{ listStyle: 'none', padding: 0 }}>
-                {Object.entries(selectedTables).map(([tableId, spots]) => {
-                  const table = mapData?.tables?.find((t:any) => t.id === tableId);
+              <ul style={{ listStyle: 'none', padding: 0, marginTop: '12px' }}>
+                {Object.entries(selectedSpots).map(([tid, spots]) => {
+                  const table = tables.find((t) => tableId(t) === tid);
                   return (
-                    <li key={tableId} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
-                      <span>Mesa {table?.code || tableId}</span>
+                    <li
+                      key={tid}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '8px 0',
+                        borderBottom: '1px solid var(--border-light)',
+                      }}
+                    >
+                      <span>Mesa {table?.code || tid.slice(0, 6)}</span>
                       <strong>{spots} cupo(s)</strong>
                     </li>
-                  )
+                  );
                 })}
               </ul>
             )}
 
-            <Button 
-              style={{ width: '100%', marginTop: '24px' }} 
-              disabled={Object.keys(selectedTables).length === 0}
-              onClick={() => setShowLegal(true)}
+            {!group?.currentPaymentId && (
+              <p style={{ color: 'var(--error)', fontSize: '0.85rem', marginTop: '12px' }}>
+                Necesitas un pago aprobado antes de reservar.
+              </p>
+            )}
+            {(!policyDoc || !termsDoc) && (
+              <p style={{ color: 'var(--error)', fontSize: '0.85rem', marginTop: '8px' }}>
+                El evento aún no tiene política y términos publicados.
+              </p>
+            )}
+
+            <Button
+              style={{ width: '100%', marginTop: '20px' }}
+              disabled={!canConfirm || !policyDoc || !termsDoc}
+              onClick={() => {
+                setLegalAccepted(false);
+                setSubmitError('');
+                setShowLegal(true);
+              }}
             >
               Reservar Mesas
             </Button>
           </GlassCard>
-          
+
           <GlassCard>
-            <h4>Estado del Invientario</h4>
+            <h4 style={{ margin: 0 }}>Estado del inventario</h4>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-              <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
-              <span style={{ fontSize: '0.875rem' }}>Disponible</span>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(57,255,20,0.35)', border: '2px solid var(--accent-primary)' }} />
+              <span style={{ fontSize: '0.85rem' }}>Disponible</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-              <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,0,0,0.2)' }} />
-              <span style={{ fontSize: '0.875rem' }}>Agotada</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,193,7,0.35)', border: '2px solid #FFC107' }} />
+              <span style={{ fontSize: '0.85rem' }}>Cupos limitados</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,0,0,0.35)', border: '2px solid var(--error)' }} />
+              <span style={{ fontSize: '0.85rem' }}>Sin cupos</span>
             </div>
           </GlassCard>
         </div>
       </div>
 
-      <Modal isOpen={showLegal} onClose={() => setShowLegal(false)} title="Términos y Condiciones">
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
-          Para continuar con la reserva, debes aceptar la política de tratamiento de datos y los términos del evento.
-        </p>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '24px' }}>
-          <input type="checkbox" checked={legalAccepted} onChange={e => setLegalAccepted(e.target.checked)} />
-          He leído y acepto los términos legales.
+      <Modal isOpen={showLegal} onClose={() => setShowLegal(false)} title="Política y Términos del Evento">
+        {policyDoc ? (
+          <section style={{ marginBottom: '20px' }}>
+            <h4 style={{ margin: '0 0 4px' }}>{policyDoc.title}</h4>
+            <small style={{ color: 'var(--text-secondary)' }}>Versión {policyDoc.versionLabel}</small>
+            <pre
+              style={{
+                marginTop: '12px',
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'inherit',
+                background: 'rgba(255,255,255,0.03)',
+                padding: '12px',
+                borderRadius: 'var(--radius-md)',
+                maxHeight: '180px',
+                overflowY: 'auto',
+              }}
+            >
+              {policyDoc.contentMarkdown || '(sin contenido)'}
+            </pre>
+          </section>
+        ) : null}
+
+        {termsDoc ? (
+          <section style={{ marginBottom: '20px' }}>
+            <h4 style={{ margin: '0 0 4px' }}>{termsDoc.title}</h4>
+            <small style={{ color: 'var(--text-secondary)' }}>Versión {termsDoc.versionLabel}</small>
+            <pre
+              style={{
+                marginTop: '12px',
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'inherit',
+                background: 'rgba(255,255,255,0.03)',
+                padding: '12px',
+                borderRadius: 'var(--radius-md)',
+                maxHeight: '180px',
+                overflowY: 'auto',
+              }}
+            >
+              {termsDoc.contentMarkdown || '(sin contenido)'}
+            </pre>
+          </section>
+        ) : null}
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px',
+            cursor: 'pointer',
+            marginBottom: '16px',
+          }}
+        >
+          <input type="checkbox" checked={legalAccepted} onChange={(e) => setLegalAccepted(e.target.checked)} />
+          <span>He leído y acepto la política de tratamiento de datos y los términos del evento.</span>
         </label>
-        
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end' }}>
-          <Button variant="secondary" onClick={() => setShowLegal(false)}>Cancelar</Button>
-          <Button onClick={confirmReservation} disabled={!legalAccepted} isLoading={loading}>Confirmar Reserva Fija</Button>
+
+        {submitError && (
+          <p style={{ color: 'var(--error)', fontSize: '0.85rem', marginBottom: '12px' }}>
+            {submitError}
+          </p>
+        )}
+
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <Button variant="secondary" onClick={() => setShowLegal(false)}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={confirmReservation}
+            disabled={!legalAccepted || !canConfirm}
+            isLoading={submitting}
+          >
+            Confirmar Reserva
+          </Button>
         </div>
       </Modal>
 
-      <Modal isOpen={reservationSuccess} onClose={() => { setReservationSuccess(false); navigate(`/portal/${session.eventId}/dashboard`); }} title="¡Reserva Exitosa!">
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <CheckCircle2 size={64} style={{ color: 'var(--success)', margin: '0 auto 20px' }} />
-          <h3>Tus ubicaciones han sido confirmadas</h3>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '12px' }}>Tus códigos secuenciales han sido asignados y la reserva es definitiva.</p>
-          <Button onClick={() => navigate(`/portal/${session.eventId}/dashboard`)} style={{ marginTop: '24px' }}>
-            Ir al Dashboard
-          </Button>
-        </div>
+      <Modal
+        isOpen={!!confirmation}
+        onClose={() => {
+          setConfirmation(null);
+          navigate(`/portal/${session.eventId}/dashboard`);
+        }}
+        title="¡Reserva Confirmada!"
+      >
+        {confirmation && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <CheckCircle2 size={48} style={{ color: 'var(--success)' }} />
+              <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>
+                Estado: <strong>{confirmation.status}</strong>
+              </p>
+            </div>
+
+            <h4 style={{ margin: '16px 0 8px' }}>Mesas asignadas</h4>
+            <ul style={{ listStyle: 'none', padding: 0, marginTop: 0 }}>
+              {confirmation.allocations.map((a) => {
+                const t = tables.find((x) => tableId(x) === a.layoutTableId);
+                return (
+                  <li key={a.layoutTableId} style={{ padding: '6px 0', borderBottom: '1px solid var(--border-light)' }}>
+                    Mesa <strong>{t?.code || a.layoutTableId.slice(0, 6)}</strong> — {a.spotsReserved} cupo(s)
+                  </li>
+                );
+              })}
+            </ul>
+
+            <h4 style={{ margin: '16px 0 8px' }}>Códigos por asistente</h4>
+            <ul style={{ listStyle: 'none', padding: 0, marginTop: 0 }}>
+              {confirmation.reservationCodes.map((c) => (
+                <li
+                  key={c.participantId}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: '6px 0',
+                    borderBottom: '1px solid var(--border-light)',
+                  }}
+                >
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {c.participantId.slice(0, 8)}…
+                  </span>
+                  <strong>{c.code}</strong>
+                </li>
+              ))}
+            </ul>
+
+            <Button
+              style={{ width: '100%', marginTop: '20px' }}
+              onClick={() => {
+                setConfirmation(null);
+                navigate(`/portal/${session.eventId}/dashboard`);
+              }}
+            >
+              Ir al Dashboard
+            </Button>
+          </div>
+        )}
       </Modal>
     </div>
   );

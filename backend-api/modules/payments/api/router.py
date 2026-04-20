@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
-from pydantic import Field
+from pydantic import AliasChoices, Field, computed_field
 
 from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
@@ -53,7 +53,23 @@ class PaymentOut(CamelOrmModel):
     status: str
     ticket_quantity: int
     payment_type: str
-    rejection_reason: str | None = None
+    amount_cents: int | None = None
+    currency: str | None = None
+    submitted_at: datetime | None = None
+    approved_at: datetime | None = None
+    rejected_at: datetime | None = None
+    # Contract §4.9 uses `reason`; legacy DB column is `rejection_reason`.
+    rejection_reason: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("rejection_reason", "reason"),
+        serialization_alias="rejectionReason",
+    )
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def reason(self) -> str | None:
+        """Canonical alias per contract §4.9."""
+        return self.rejection_reason
 
 
 def _check_stage_limit(db, event_id: UUID, requested_tickets: int) -> None:
@@ -121,12 +137,20 @@ def patch_payment(
     _buyer_group(db, claims, p.attendee_group_id)
     if p.status not in ("DRAFT", "REJECTED"):
         raise ConflictError("Payment cannot be edited in current status", code=PAYMENT_INVALID_STATE)
+
+    patch_data = body.model_dump(exclude_unset=True)
+    # Re-apply stage limits when the ticket quantity changes, matching
+    # RN-TIME-02/03 so the buyer cannot bypass presale/sale caps via PATCH.
+    new_qty = patch_data.get("ticket_quantity")
+    if new_qty is not None and new_qty != p.ticket_quantity:
+        _check_stage_limit(db, p.event_id, new_qty)
+
     if p.status == "REJECTED":
         p.status = "DRAFT"
         p.rejected_at = None
         p.rejection_reason = None
         p.reviewed_by_user_id = None
-    for k, v in body.model_dump(exclude_unset=True).items():
+    for k, v in patch_data.items():
         setattr(p, k, v)
     db.flush()
     return p
@@ -257,7 +281,7 @@ class CashPaymentCreate(CamelModel):
     ticket_quantity: int = Field(ge=1)
     amount_cents: int | None = None
     currency: str = Field(default="COP", max_length=3)
-    receipt_file_url: str | None = None
+    receipt_file_url: str = Field(min_length=1)
 
 
 @router.post("/events/{event_id}/cash-payments", response_model=PaymentOut)
@@ -271,6 +295,11 @@ def create_cash_payment(
     g = db.get(AttendeeGroup, body.attendee_group_id)
     if g is None or g.event_id != event_id:
         raise HTTPException(status_code=400, detail="Invalid group for event")
+    if not body.receipt_file_url:
+        raise ValidationError(
+            "Cash payment requires receipt evidence",
+            code=MISSING_PAYMENT_EVIDENCE,
+        )
     pay = Payment(
         event_id=event_id,
         attendee_group_id=body.attendee_group_id,
@@ -283,15 +312,14 @@ def create_cash_payment(
     )
     db.add(pay)
     db.flush()
-    if body.receipt_file_url:
-        db.add(
-            PaymentEvidence(
-                payment_id=pay.id,
-                file_url=body.receipt_file_url,
-                evidence_type="CASH_RECEIPT",
-                uploaded_by_actor_type="STAFF",
-            )
+    db.add(
+        PaymentEvidence(
+            payment_id=pay.id,
+            file_url=body.receipt_file_url,
+            evidence_type="CASH_RECEIPT",
+            uploaded_by_actor_type="STAFF",
         )
+    )
     g.current_payment_id = pay.id
     ev = db.get(Event, event_id)
     append_audit_log(
@@ -324,6 +352,11 @@ def evidence_upload_url(
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     _buyer_group(db, claims, p.attendee_group_id)
+    if p.status in ("APPROVED", "REJECTED"):
+        raise ConflictError(
+            "Cannot upload evidence to a reviewed payment",
+            code=PAYMENT_ALREADY_REVIEWED,
+        )
     url = generate_upload_url(
         bucket="payment-evidence",
         object_key=f"{p.event_id}/{payment_id}/{uuid4().hex}",

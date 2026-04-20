@@ -22,6 +22,17 @@ services:
     networks:
       - events_net
 
+  # Opcional: Redis compartido para `IdempotencyStore` en despliegues multi-réplica.
+  # Mantener comentado en single-instance/MVP (el fallback in-memory es suficiente).
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: events_redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - events_net
+
   backend:
     build:
       context: ..
@@ -37,6 +48,10 @@ services:
       CORS_ORIGINS: "${CORS_ORIGINS:-*}"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ROOT_PATH: "${ROOT_PATH:-/api}"
+      # Idempotencia (doc 8 §8). Vacío => store in-memory. Con Redis compartido,
+      # descomentar el servicio `redis` de arriba y poner REDIS_URL=redis://redis:6379/0.
+      REDIS_URL: "${REDIS_URL:-}"
+      IDEMPOTENCY_TTL_SECONDS: "${IDEMPOTENCY_TTL_SECONDS:-3600}"
     depends_on:
       db:
         condition: service_healthy
@@ -45,13 +60,20 @@ services:
     networks:
       - events_net
 
-  # frontend:
-  #   build:
-  #     context: ..
-  #     dockerfile: docker/frontend.Dockerfile
-  #   container_name: events_frontend
-  #   networks:
-  #     - events_net
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        # Los VITE_* se inyectan en tiempo de build para quedar horneados en el
+        # bundle estático que sirve Nginx dentro del contenedor.
+        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-/api/v1}"
+        VITE_API_TIMEOUT_MS: "${VITE_API_TIMEOUT_MS:-20000}"
+        VITE_EVIDENCE_STORAGE: "${VITE_EVIDENCE_STORAGE:-signed}"
+        VITE_EVIDENCE_MAX_MB: "${VITE_EVIDENCE_MAX_MB:-5}"
+    container_name: events_frontend
+    networks:
+      - events_net
 
   nginx:
     image: nginx:1.27-alpine
@@ -61,7 +83,7 @@ services:
     volumes:
       - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      # - frontend
+      - frontend
       - backend
     networks:
       - events_net

@@ -53,8 +53,8 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
            layoutVersion: 1
        }, { token: sessionToken, isBearer: true });
 
-      // 3. Put configurations
-       await apiClient.post(`/events/${newEventId}/configuration`, {
+      // 3. Put configurations (§4.2.1 uses PUT, includes venue/event date fields)
+       await apiClient.put(`/events/${newEventId}/configuration`, {
           presaleStartDate: formData.presaleStart ? new Date(formData.presaleStart).toISOString() : new Date().toISOString(),
           presaleEndDate: formData.presaleEnd ? new Date(formData.presaleEnd).toISOString() : new Date().toISOString(),
           saleStartDate: formData.saleStart ? new Date(formData.saleStart).toISOString() : new Date().toISOString(),
@@ -62,8 +62,10 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
           maxPresaleTickets: formData.maxPresale,
           maxSaleTickets: formData.maxSale,
           timezone: "America/Bogota",
-          mapVisibilityPolicy: "AFTER_PAYMENT_APPROVED"
-       }, { token: sessionToken, isBearer: true }).catch(() => null);
+          mapVisibilityPolicy: "AFTER_PAYMENT_APPROVED",
+          eventDate: formData.eventDate ? new Date(formData.eventDate).toISOString() : undefined,
+          venueName: wizardData.venueName || undefined,
+       }, { token: sessionToken, isBearer: true });
 
        alert('¡Evento creado, publicado y configurado exitosamente!');
        navigate('/staff/dashboard');

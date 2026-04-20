@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     # Prefijo público cuando Nginx (u otro proxy) expone la API bajo /api (Swagger / Try it out).
     root_path: str = Field(default="", validation_alias="ROOT_PATH")
 
+    # Idempotency store. Leave empty for in-memory (MVP); set to a Redis URL in
+    # production to share the cache across replicas.
+    redis_url: str = Field(default="", validation_alias="REDIS_URL")
+    idempotency_ttl_seconds: int = Field(
+        default=3600, validation_alias="IDEMPOTENCY_TTL_SECONDS"
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -100,6 +100,14 @@ class EventConfigurationUpdate(CamelModel):
     max_presale_tickets: int = Field(default=4, ge=0)
     max_sale_tickets: int = Field(default=3, ge=0)
     map_visibility_policy: str = Field(default="AFTER_PAYMENT_APPROVED", max_length=64)
+    # Optional event/venue fields (contract §4.2.1). If provided, copied to the
+    # Event row when the configuration is persisted; they do NOT belong to the
+    # EventConfiguration table.
+    event_date: datetime | None = None
+    venue_name: str | None = Field(default=None, max_length=300)
+    venue_address: str | None = None
+    venue_lat: float | None = None
+    venue_lon: float | None = None
 
 
 class EventConfigurationOut(CamelOrmModel):
@@ -115,6 +123,26 @@ class EventConfigurationOut(CamelOrmModel):
     map_visibility_policy: str
 
 
+_EVENT_FIELD_MAP = {
+    "event_date": "event_date",
+    "venue_name": "venue_name_snapshot",
+    "venue_address": "venue_address_snapshot",
+    "venue_lat": "venue_lat",
+    "venue_lon": "venue_lon",
+}
+
+_CONFIG_FIELDS = {
+    "timezone",
+    "presale_start_date",
+    "presale_end_date",
+    "sale_start_date",
+    "sale_end_date",
+    "max_presale_tickets",
+    "max_sale_tickets",
+    "map_visibility_policy",
+}
+
+
 @router.put("/{event_id}/configuration", response_model=EventConfigurationOut)
 def put_configuration(
     event_id: UUID,
@@ -122,16 +150,31 @@ def put_configuration(
     db: DbSession,
     staff: StaffUserDep,
 ) -> EventConfiguration:
-    ensure_event_staff_access(db, staff, event_id)
+    ev = ensure_event_staff_access(db, staff, event_id)
+
+    payload = body.model_dump(exclude_unset=True)
+    event_updates = {
+        _EVENT_FIELD_MAP[k]: payload[k]
+        for k in _EVENT_FIELD_MAP
+        if k in payload and payload[k] is not None
+    }
+    if event_updates:
+        for attr, value in event_updates.items():
+            setattr(ev, attr, value)
+
+    config_payload = {
+        k: v for k, v in body.model_dump().items() if k in _CONFIG_FIELDS
+    }
+
     existing = db.execute(
         select(EventConfiguration).where(EventConfiguration.event_id == event_id)
     ).scalar_one_or_none()
     if existing:
-        for k, v in body.model_dump().items():
+        for k, v in config_payload.items():
             setattr(existing, k, v)
         db.flush()
         return existing
-    cfg = EventConfiguration(event_id=event_id, **body.model_dump())
+    cfg = EventConfiguration(event_id=event_id, **config_payload)
     db.add(cfg)
     db.flush()
     return cfg

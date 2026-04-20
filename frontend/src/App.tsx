@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Palette } from 'lucide-react';
 import { PortalCodeLogin } from './pages/portal/PortalCodeLogin';
 import { PortalDashboard } from './pages/portal/PortalDashboard';
 import { PortalAttendees } from './pages/portal/PortalAttendees';
 import { PortalPayment } from './pages/portal/PortalPayment';
 import { PortalMap } from './pages/portal/PortalMap';
+import { PortalPaymentStatus } from './pages/portal/PortalPaymentStatus';
 import { PortalLanding } from './pages/portal/PortalLanding';
 import { StaffLogin } from './pages/staff/StaffLogin';
 import { StaffDashboard } from './pages/staff/StaffDashboard';
@@ -13,12 +15,19 @@ import { StaffStudents } from './pages/staff/StaffStudents';
 import { StaffPolicies } from './pages/staff/StaffPolicies';
 import { StaffMap } from './pages/staff/StaffMap';
 import { StaffEventWizard } from './pages/staff/StaffEventWizard';
+import { StaffManualAdjustments } from './pages/staff/StaffManualAdjustments';
+import { StaffAudit } from './pages/staff/StaffAudit';
+import { RequireBuyerAuth, RequireStaffAuth } from './router/guards';
 
 function ThemeSelector() {
-  const [theme, setTheme] = useState('theme-neon-green');
+  const [theme, setTheme] = useState<string>(() => {
+    return localStorage.getItem('app_theme') || 'theme-neon-green';
+  });
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     document.body.className = theme;
+    localStorage.setItem('app_theme', theme);
   }, [theme]);
 
   const themes = [
@@ -29,23 +38,61 @@ function ThemeSelector() {
   ];
 
   return (
-    <div className="glass-panel" style={{ position: 'fixed', bottom: '20px', right: '20px', display: 'flex', gap: '8px', zIndex: 1000, padding: '8px', borderRadius: 'var(--radius-full)' }}>
-      {themes.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => setTheme(t.id)}
-          title={t.name}
+    <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 1000 }}>
+      <button
+        aria-label="Cambiar tema visual"
+        title="Cambiar tema"
+        onClick={() => setOpen((v) => !v)}
+        className="glass-panel"
+        style={{
+          width: '42px',
+          height: '42px',
+          borderRadius: '50%',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--text-primary)',
+          padding: 0,
+        }}
+      >
+        <Palette size={20} />
+      </button>
+      {open && (
+        <div
+          className="glass-panel animate-slide-up"
           style={{
-            width: '24px',
-            height: '24px',
-            borderRadius: '50%',
-            backgroundColor: t.color,
-            border: theme === t.id ? '2px solid white' : '2px solid transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
+            position: 'absolute',
+            bottom: '52px',
+            right: 0,
+            padding: '10px',
+            display: 'flex',
+            gap: '8px',
+            borderRadius: 'var(--radius-full)',
           }}
-        />
-      ))}
+        >
+          {themes.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => {
+                setTheme(t.id);
+                setOpen(false);
+              }}
+              title={t.name}
+              aria-label={`Tema ${t.name}`}
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                backgroundColor: t.color,
+                border: theme === t.id ? '2px solid white' : '2px solid transparent',
+                cursor: 'pointer',
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -96,10 +143,11 @@ export default function App() {
           <PortalLayout>
             <Routes>
               <Route path="login" element={<PortalCodeLogin />} />
-              <Route path="dashboard" element={<PortalDashboard />} />
-              <Route path="attendees" element={<PortalAttendees />} />
-              <Route path="payment" element={<PortalPayment />} />
-              <Route path="map" element={<PortalMap />} />
+              <Route path="dashboard" element={<RequireBuyerAuth><PortalDashboard /></RequireBuyerAuth>} />
+              <Route path="attendees" element={<RequireBuyerAuth><PortalAttendees /></RequireBuyerAuth>} />
+              <Route path="payment" element={<RequireBuyerAuth><PortalPayment /></RequireBuyerAuth>} />
+              <Route path="payment-status" element={<RequireBuyerAuth><PortalPaymentStatus /></RequireBuyerAuth>} />
+              <Route path="map" element={<RequireBuyerAuth><PortalMap /></RequireBuyerAuth>} />
               <Route path="" element={<Navigate to="login" />} />
             </Routes>
           </PortalLayout>
@@ -110,12 +158,14 @@ export default function App() {
           <StaffLayout>
             <Routes>
               <Route path="login" element={<StaffLogin />} />
-              <Route path="dashboard" element={<StaffDashboard />} />
-              <Route path="events/:eventId/payments" element={<StaffPayments />} />
-              <Route path="events/new" element={<StaffEventWizard />} />
-              <Route path="events/:eventId/students" element={<StaffStudents />} />
-              <Route path="events/:eventId/policies" element={<StaffPolicies />} />
-              <Route path="events/:eventId/map" element={<StaffMap />} />
+              <Route path="dashboard" element={<RequireStaffAuth><StaffDashboard /></RequireStaffAuth>} />
+              <Route path="events/new" element={<RequireStaffAuth><StaffEventWizard /></RequireStaffAuth>} />
+              <Route path="events/:eventId/payments" element={<RequireStaffAuth><StaffPayments /></RequireStaffAuth>} />
+              <Route path="events/:eventId/students" element={<RequireStaffAuth><StaffStudents /></RequireStaffAuth>} />
+              <Route path="events/:eventId/policies" element={<RequireStaffAuth><StaffPolicies /></RequireStaffAuth>} />
+              <Route path="events/:eventId/map" element={<RequireStaffAuth><StaffMap /></RequireStaffAuth>} />
+              <Route path="events/:eventId/manual-adjustments" element={<RequireStaffAuth><StaffManualAdjustments /></RequireStaffAuth>} />
+              <Route path="events/:eventId/audit" element={<RequireStaffAuth><StaffAudit /></RequireStaffAuth>} />
               <Route path="" element={<Navigate to="login" />} />
             </Routes>
           </StaffLayout>

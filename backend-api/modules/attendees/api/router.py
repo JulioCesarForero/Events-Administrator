@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
@@ -7,7 +8,14 @@ from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from infrastructure.persistence.models import AttendeeGroup, Event, EventConfiguration, Participant, StaffUser
+from infrastructure.persistence.models import (
+    AttendeeGroup,
+    Event,
+    EventConfiguration,
+    Participant,
+    Payment,
+    StaffUser,
+)
 from modules.attendees.domain.rules import ensure_participant_editable_window
 from shared.api.deps import (
     BuyerClaimsDep,
@@ -32,6 +40,17 @@ def _get_group_for_buyer(db: Session, claims: dict, event_id: UUID) -> AttendeeG
     return g
 
 
+class MyGroupPaymentOut(CamelOrmModel):
+    id: UUID
+    status: str
+    ticket_quantity: int
+    payment_type: str
+    rejection_reason: str | None = None
+    submitted_at: datetime | None = None
+    approved_at: datetime | None = None
+    rejected_at: datetime | None = None
+
+
 class MyGroupOut(CamelOrmModel):
     group_id: UUID = Field(validation_alias="id")
     event_id: UUID
@@ -39,6 +58,10 @@ class MyGroupOut(CamelOrmModel):
     display_name: str | None
     reservation_status: str
     approved_ticket_count: int
+    current_payment_id: UUID | None = None
+    current_payment: MyGroupPaymentOut | None = None
+    event_date: datetime | None = None
+    timezone: str | None = None
 
 
 @router.get("/portal/events/{event_id}/my-group", response_model=MyGroupOut)
@@ -46,9 +69,39 @@ def get_my_group(
     event_id: UUID,
     db: DbSession,
     claims: BuyerClaimsDep,
-) -> AttendeeGroup:
+) -> MyGroupOut:
     g = _get_group_for_buyer(db, claims, event_id)
-    return g
+    ev = db.get(Event, event_id)
+    cfg = db.execute(
+        select(EventConfiguration).where(EventConfiguration.event_id == event_id)
+    ).scalar_one_or_none()
+    pay: Payment | None = (
+        db.get(Payment, g.current_payment_id) if g.current_payment_id else None
+    )
+    payment_out = None
+    if pay is not None:
+        payment_out = MyGroupPaymentOut(
+            id=pay.id,
+            status=pay.status,
+            ticket_quantity=pay.ticket_quantity,
+            payment_type=pay.payment_type,
+            rejection_reason=pay.rejection_reason,
+            submitted_at=pay.submitted_at,
+            approved_at=pay.approved_at,
+            rejected_at=pay.rejected_at,
+        )
+    return MyGroupOut(
+        group_id=g.id,
+        event_id=g.event_id,
+        student_code_snapshot=g.student_code_snapshot,
+        display_name=g.display_name,
+        reservation_status=g.reservation_status,
+        approved_ticket_count=g.approved_ticket_count,
+        current_payment_id=g.current_payment_id,
+        current_payment=payment_out,
+        event_date=ev.event_date if ev else None,
+        timezone=cfg.timezone if cfg else None,
+    )
 
 
 class ParticipantCreate(CamelModel):

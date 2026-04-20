@@ -77,6 +77,9 @@ export const StaffDashboard = () => {
                <Button size="sm" onClick={() => navigate(`/staff/events/${ev.id}/payments`)}>Revisión Pagos</Button>
                <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/students`)}>Estudiantes</Button>
                <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/map`)}>Ver Mapa</Button>
+               <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/policies`)}>Políticas</Button>
+               <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/manual-adjustments`)}>Ajustes</Button>
+               <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/audit`)}>Auditoría</Button>
             </div>
           </GlassCard>
         ))}

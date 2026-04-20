@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { InputHTMLAttributes } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -15,18 +16,30 @@ export const Input: React.FC<InputProps> = ({
   id,
   ...props
 }) => {
-  const inputId = id || Math.random().toString(36).substring(7);
+  const autoId = useId();
+  const inputId = id || autoId;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
       {label && (
-        <label htmlFor={inputId} style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+        <label
+          htmlFor={inputId}
+          style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}
+        >
           {label}
         </label>
       )}
       <div style={{ position: 'relative' }}>
         {Icon && (
-          <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
+          <div
+            style={{
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-muted)',
+            }}
+          >
             <Icon size={18} />
           </div>
         )}
@@ -35,13 +48,17 @@ export const Input: React.FC<InputProps> = ({
           className={`glass-input ${className}`}
           style={{
             paddingLeft: Icon ? '40px' : '16px',
-            borderColor: error ? 'var(--error)' : undefined
+            borderColor: error ? 'var(--error)' : undefined,
           }}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${inputId}-error` : undefined}
           {...props}
         />
       </div>
       {error && (
-        <span style={{ fontSize: '0.75rem', color: 'var(--error)' }}>{error}</span>
+        <span id={`${inputId}-error`} style={{ fontSize: '0.75rem', color: 'var(--error)' }}>
+          {error}
+        </span>
       )}
     </div>
   );

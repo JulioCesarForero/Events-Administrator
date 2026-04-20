@@ -1,13 +1,22 @@
 from fastapi import APIRouter, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.health import router as health_router
 from app.lifespan import lifespan
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.logging_context import RequestLoggingContextMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_id import RequestIdMiddleware
 from config.settings import settings
+from domain.error_codes import (
+    FORBIDDEN,
+    INVALID_PAYLOAD,
+    NOT_FOUND,
+    UNAUTHENTICATED,
+)
 from domain.exceptions import DomainError
 from shared.exceptions.http_map import domain_error_to_status
 from modules.attendees.api.router import router as attendees_router
@@ -50,6 +59,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(IdempotencyMiddleware)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(RequestLoggingContextMiddleware)
 
@@ -65,6 +75,71 @@ def create_app() -> FastAPI:
             correlation_id=rid,
         )
         return JSONResponse(status_code=status, content=body)
+
+    _STATUS_TO_CODE = {
+        400: INVALID_PAYLOAD,
+        401: UNAUTHENTICATED,
+        403: FORBIDDEN,
+        404: NOT_FOUND,
+    }
+
+    def _coerce_detail(detail: object) -> tuple[str | None, str | None]:
+        """Extract (code, message) from an HTTPException detail payload."""
+        if isinstance(detail, dict):
+            code = detail.get("code")
+            message = detail.get("message") or detail.get("detail")
+            return (
+                code if isinstance(code, str) else None,
+                message if isinstance(message, str) else None,
+            )
+        if isinstance(detail, str):
+            return None, detail
+        return None, None
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_exception_handler(
+        request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        rid = getattr(request.state, "request_id", None)
+        status = exc.status_code
+        code, message = _coerce_detail(exc.detail)
+        if code is None:
+            code = _STATUS_TO_CODE.get(status)
+        title = code or (message or "HTTPError")
+        body = problem_response(
+            status=status,
+            title=title,
+            detail=message,
+            code=code,
+            correlation_id=rid,
+        )
+        headers = getattr(exc, "headers", None) or None
+        return JSONResponse(status_code=status, content=body, headers=headers)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        rid = getattr(request.state, "request_id", None)
+        errors = exc.errors()
+        first = errors[0] if errors else None
+        message = first.get("msg") if first else "Invalid payload"
+        body = problem_response(
+            status=422,
+            title=INVALID_PAYLOAD,
+            detail=message,
+            code=INVALID_PAYLOAD,
+            correlation_id=rid,
+        )
+        body["errors"] = [
+            {
+                "loc": list(e.get("loc", [])),
+                "msg": e.get("msg"),
+                "type": e.get("type"),
+            }
+            for e in errors
+        ]
+        return JSONResponse(status_code=422, content=body)
 
     app.include_router(health_router)
 

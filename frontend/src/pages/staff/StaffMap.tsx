@@ -47,7 +47,7 @@ export const StaffMap = () => {
       <GlassCard style={{ minHeight: '500px', position: 'relative', overflow: 'hidden' }}>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Vista operativa de las mesas y su disponibilidad según backend.</p>
         
-        <div style={{ position: 'relative', width: '100%', height: '400px', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}>
+        <div style={{ position: 'relative', width: '100%', minHeight: '400px', overflow: 'auto', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}>
           {mapData?.tables?.map((t: any) => {
             const isFull = t.availableSpots === 0;
             return (
