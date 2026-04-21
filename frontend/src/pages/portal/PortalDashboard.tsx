@@ -38,9 +38,22 @@ interface StepDef {
   hint?: string;
 }
 
-function paymentStepDetails(p: Payment | null): Pick<StepDef, 'status' | 'badge' | 'hint'> {
+function paymentStepDetails(
+  p: Payment | null,
+  attendeesReady: boolean,
+): Pick<StepDef, 'status' | 'badge' | 'hint'> {
   if (!p) {
-    return { status: 'pending', badge: undefined, hint: 'Aún no registras ningún pago.' };
+    // Sin pago todavía: el paso está listo para crearse (active) en cuanto
+    // el usuario haya registrado al menos un asistente. Antes devolvía
+    // 'pending' incondicionalmente y eso dejaba el botón "Registrar pago"
+    // siempre deshabilitado para usuarios nuevos (chicken-and-egg).
+    return {
+      status: attendeesReady ? 'active' : 'pending',
+      badge: undefined,
+      hint: attendeesReady
+        ? 'Aún no registras ningún pago. Haz clic para comenzar.'
+        : 'Primero registra a los asistentes para poder calcular las boletas.',
+    };
   }
   switch (p.status) {
     case 'DRAFT':
@@ -132,7 +145,7 @@ export const PortalDashboard = () => {
     if (!session) return [];
     const attendeesStatus: StepStatus =
       participantCount !== null && participantCount > 0 ? 'done' : 'active';
-    const payDetails = paymentStepDetails(payment);
+    const payDetails = paymentStepDetails(payment, attendeesStatus === 'done');
     const reserved = (group?.reservationStatus || 'NONE') === 'CONFIRMED';
     const mapActive = payDetails.status === 'done' && !reserved;
     return [
