@@ -316,7 +316,7 @@ def create_cash_payment(
         PaymentEvidence(
             payment_id=pay.id,
             file_url=body.receipt_file_url,
-            evidence_type="CASH_RECEIPT",
+            evidence_type="CASH_RECEIPT_PHOTO",
             uploaded_by_actor_type="STAFF",
         )
     )
@@ -347,6 +347,7 @@ def evidence_upload_url(
     claims: BuyerClaimsDep,
 ) -> EvidenceUrlResponse:
     from infrastructure.storage.signed_urls import generate_upload_url
+    from config.settings import settings
 
     p = db.get(Payment, payment_id)
     if p is None:
@@ -357,9 +358,13 @@ def evidence_upload_url(
             "Cannot upload evidence to a reviewed payment",
             code=PAYMENT_ALREADY_REVIEWED,
         )
+    
+    ev = db.get(Event, p.event_id)
+    tenant_id = ev.tenant_id if ev else "default-tenant"
+    
     url = generate_upload_url(
-        bucket="payment-evidence",
-        object_key=f"{p.event_id}/{payment_id}/{uuid4().hex}",
+        bucket=settings.gcs_bucket_name,
+        object_key=f"tenants/{tenant_id}/events/{p.event_id}/payments/{payment_id}/{uuid4().hex}",
     )
     return EvidenceUrlResponse(upload_url=url)
 
@@ -367,7 +372,7 @@ def evidence_upload_url(
 class EvidenceRegister(CamelModel):
     file_url: str
     mime_type: str | None = None
-    evidence_type: str = Field(default="RECEIPT", max_length=64)
+    evidence_type: str = Field(default="DIGITAL_PROOF", max_length=64)
     storage_path: str | None = None
     file_name: str | None = Field(default=None, max_length=300)
     size_bytes: int | None = Field(default=None, ge=0)

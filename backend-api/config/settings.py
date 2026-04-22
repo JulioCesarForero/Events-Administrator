@@ -38,6 +38,10 @@ class Settings(BaseSettings):
         default=3600, validation_alias="IDEMPOTENCY_TTL_SECONDS"
     )
 
+    gcs_bucket_name: str = Field(
+        default="events-admin-prod-2026", validation_alias="GCS_BUCKET_NAME"
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

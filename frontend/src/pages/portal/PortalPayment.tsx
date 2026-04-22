@@ -4,8 +4,6 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { apiClient } from '../../api/client';
-import { uploadPaymentEvidence } from '../../api/storage';
-import { isFirebaseConfigured } from '../../firebase';
 import {
   ArrowLeft,
   Upload,
@@ -18,11 +16,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 type PaymentType = 'DIGITAL' | 'CASH';
-
-const EVIDENCE_STORAGE = (
-  (import.meta as unknown as { env?: Record<string, string> })?.env
-    ?.VITE_EVIDENCE_STORAGE || 'firebase'
-).toLowerCase();
 
 const EVIDENCE_MAX_MB = Number(
   (import.meta as unknown as { env?: Record<string, string> })?.env
@@ -107,57 +100,29 @@ export const PortalPayment = () => {
     if (!session) throw new Error('Sin sesión');
     const mimeType = file.type || 'application/octet-stream';
 
-    if (EVIDENCE_STORAGE === 'firebase') {
-      if (!isFirebaseConfigured) {
-        throw new Error(
-          'Firebase Storage no está configurado. Contacta al comité para habilitarlo.',
-        );
-      }
-      const up = await uploadPaymentEvidence({
-        file,
-        eventId: session.eventId,
-        groupId: session.groupId,
-        paymentId,
-      });
-      return {
-        fileUrl: up.downloadURL,
-        storagePath: up.storagePath,
-        fileName: up.fileName,
-        sizeBytes: up.sizeBytes,
-        mimeType: up.contentType,
-      };
-    }
-
-    if (EVIDENCE_STORAGE === 'signed') {
-      const res = await apiClient.post<{ uploadUrl: string }>(
-        `/payments/${paymentId}/evidence-upload-url`,
-        {},
-        { token: session.sessionToken, isBearer: true },
-      );
-      const putRes = await fetch(res.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': mimeType },
-        body: file,
-      });
-      if (!putRes.ok) {
-        throw new Error(`Subida fallida (status ${putRes.status})`);
-      }
-      return {
-        fileUrl: res.uploadUrl.split('?')[0] || res.uploadUrl,
-        fileName: file.name,
-        sizeBytes: file.size,
-        mimeType,
-      };
-    }
-
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => resolve(ev.target?.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+    // Request Signed URL from backend
+    const res = await apiClient.post<{ uploadUrl: string }>(
+      `/payments/${paymentId}/evidence-upload-url`,
+      {},
+      { token: session.sessionToken, isBearer: true },
+    );
+    
+    // Upload directly to Google Cloud Storage
+    const putRes = await fetch(res.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': mimeType },
+      body: file,
     });
+    
+    if (!putRes.ok) {
+      throw new Error(`Subida fallida (code: ${putRes.status})`);
+    }
+    
+    // The bucket path from the signature is before the query string
+    const baseUrl = res.uploadUrl.split('?')[0];
+
     return {
-      fileUrl: dataUrl,
+      fileUrl: baseUrl || res.uploadUrl,
       fileName: file.name,
       sizeBytes: file.size,
       mimeType,

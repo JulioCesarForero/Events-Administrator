@@ -56,7 +56,7 @@ def test_list_evidences_returns_rows() -> None:
         payment_id=payment_id,
         file_url="https://firebasestorage.googleapis.com/...token=abc",
         mime_type="image/png",
-        evidence_type="RECEIPT",
+        evidence_type="DIGITAL_PROOF",
         uploaded_by_actor_type="BUYER",
         storage_path=f"payment-evidence/{event_id}/gid/{payment_id}/123_file.png",
         file_name="file.png",
