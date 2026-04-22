@@ -52,20 +52,19 @@ export const LayoutStep = ({ wizardData, setWizardData, onNext, onPrev, sessionT
       const layoutRes = await apiClient.post<any>(`/venues/${wizardData.venueId}/layouts`, { name: newName, status: "DRAFT" }, { token: sessionToken, isBearer: true });
       const createdLayoutId = layoutRes.id || 'lay_mock';
 
-      // 2. Utilidad background gen para "n" mesas (El api real exige enviarlas una a una, lo simulamos para no romper el backend)
-      // En un endpoint masivo óptimo tendríamos un /bulk, pero usamos loop controlado
-      const tablePromises = [];
+      // 2. Utilidad background gen para "n" mesas (El api real exige enviarlas una a una)
+      // Generamos secuencialmente para no saturar el pool de conexiones de la BD (Free Tier)
       for(let i = 1; i <= tableCount; i++){
-         tablePromises.push(
-            apiClient.post(`/layouts/${createdLayoutId}/tables`, {
-                code: `M${i}`,
-                capacity: cupsPerTable,
-                position: { x: (i%5)*80, y: Math.floor(i/5)*80, rotationDeg: 0 }
-            }, { token: sessionToken, isBearer: true }).catch(() => null)
-         );
+         try {
+           await apiClient.post(`/layouts/${createdLayoutId}/tables`, {
+               code: `M${i}`,
+               tableCapacityLimit: cupsPerTable,
+               positionJson: { x: (i%5)*80, y: Math.floor(i/5)*80, rotationDeg: 0 }
+           }, { token: sessionToken, isBearer: true });
+         } catch (e) {
+           console.error(`Error creando mesa M${i}`, e);
+         }
       }
-      
-      await Promise.all(tablePromises);
 
       setWizardData({ ...wizardData, layoutId: createdLayoutId, layoutName: newName });
       onNext();

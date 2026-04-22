@@ -29,6 +29,7 @@ from modules.map.api.router import router as map_router
 from modules.operations.api.router import router as operations_router
 from modules.payments.api.router import router as payments_router
 from modules.reservations.api.router import router as reservations_router
+from modules.staff_admin.api.router import router as staff_admin_router
 from modules.students.api.router import router as students_router
 from modules.venues.api.router import router as venues_router
 from modules.venues.api.tables_router import router as layout_tables_router
@@ -157,9 +158,20 @@ def create_app() -> FastAPI:
     v1.include_router(reservations_router)
     v1.include_router(audit_router)
     v1.include_router(operations_router)
+    v1.include_router(staff_admin_router)
     app.include_router(v1)
 
     return app
 
 
-app = create_app()
+_fastapi_app = create_app()
+
+# Wrap with prefix stripping so the app works behind proxies that do NOT
+# rewrite paths (Firebase Hosting → Cloud Run).  When Nginx already strips
+# the prefix the middleware is a no-op (idempotent).
+if settings.root_path:
+    from app.middleware.strip_prefix import StripPrefixMiddleware
+
+    app = StripPrefixMiddleware(_fastapi_app, prefix=settings.root_path)
+else:
+    app = _fastapi_app

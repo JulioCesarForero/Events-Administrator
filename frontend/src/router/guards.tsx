@@ -74,3 +74,26 @@ export const RequireStaffAuth = ({ children }: GuardProps) => {
 
   return <>{children}</>;
 };
+
+const TENANT_ADMIN_ROLES = new Set(['ADMIN', 'OWNER']);
+
+/**
+ * Extra gate on top of `RequireStaffAuth` that only lets tenant admins through.
+ * Non-admin staff are bounced back to the dashboard.
+ */
+export const RequireTenantAdmin = ({ children }: GuardProps) => {
+  const { session } = useAuthStaff();
+
+  if (!session) {
+    return <Navigate to="/staff/login" replace />;
+  }
+  const payload = decodeJwtPayload(session.accessToken);
+  if (isExpired(payload)) {
+    return <Navigate to="/staff/login" replace />;
+  }
+  if (!session.role || !TENANT_ADMIN_ROLES.has(session.role)) {
+    return <Navigate to="/staff/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};

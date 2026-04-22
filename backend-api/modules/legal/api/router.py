@@ -1,12 +1,12 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import Field
 
 from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
-from infrastructure.persistence.models import AttendeeGroup, EventPolicyDocument, ReservationConsent
+from infrastructure.persistence.models import AttendeeGroup, Event, EventPolicyDocument, ReservationConsent
 from shared.api.deps import BuyerClaimsDep, DbSession, StaffUserDep, buyer_group_id, ensure_event_staff_access
 
 router = APIRouter(tags=["legal"])
@@ -26,6 +26,17 @@ class LegalDocOut(CamelOrmModel):
     version_label: str
     title: str
     status: str
+
+
+class PublishedLegalDocOut(CamelOrmModel):
+    id: UUID
+    event_id: UUID
+    document_type: str
+    version_label: str
+    title: str
+    content_markdown: str
+    status: str
+    published_at: datetime | None = None
 
 
 class LegalDocPatch(CamelModel):
@@ -104,6 +115,30 @@ def publish_legal_doc(
     doc.published_at = datetime.now(UTC)
     db.flush()
     return doc
+
+
+@router.get(
+    "/portal/events/{event_id}/published-legal-documents",
+    response_model=list[PublishedLegalDocOut],
+)
+def list_published_legal_docs(
+    event_id: UUID,
+    db: DbSession,
+    document_type: str | None = Query(default=None, alias="type", max_length=32),
+) -> list[EventPolicyDocument]:
+    """Public endpoint so buyers (and the login screen) can read the latest
+    published Política de tratamiento de datos / Términos y condiciones
+    for an event without authentication."""
+    if db.get(Event, event_id) is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    stmt = select(EventPolicyDocument).where(
+        EventPolicyDocument.event_id == event_id,
+        EventPolicyDocument.status == "PUBLISHED",
+    )
+    if document_type:
+        stmt = stmt.where(EventPolicyDocument.document_type == document_type)
+    stmt = stmt.order_by(EventPolicyDocument.published_at.desc().nullslast())
+    return list(db.execute(stmt).scalars())
 
 
 class AcceptedLegalOut(CamelModel):

@@ -6,7 +6,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { apiClient } from '../../api/client';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, X, Eye, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Check, X, Eye, AlertTriangle, ExternalLink, FileText } from 'lucide-react';
 
 interface PaymentRow {
   id: string;
@@ -19,6 +19,26 @@ interface PaymentRow {
   submittedAt?: string | null;
   rejectionReason?: string | null;
   reason?: string | null;
+}
+
+interface EvidenceRow {
+  id: string;
+  paymentId: string;
+  fileUrl: string;
+  mimeType?: string | null;
+  evidenceType: string;
+  uploadedByActorType: string;
+  storagePath?: string | null;
+  fileName?: string | null;
+  sizeBytes?: number | null;
+  createdAt: string;
+}
+
+function formatSize(bytes?: number | null): string {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 export const StaffPayments = () => {
@@ -37,6 +57,10 @@ export const StaffPayments = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  const [evidences, setEvidences] = useState<EvidenceRow[]>([]);
+  const [evidencesLoading, setEvidencesLoading] = useState(false);
+  const [evidencesError, setEvidencesError] = useState('');
 
   const loadPayments = useCallback(async () => {
     if (!session || !eventId) return;
@@ -60,6 +84,35 @@ export const StaffPayments = () => {
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
+
+  useEffect(() => {
+    if (!session || !active) {
+      setEvidences([]);
+      setEvidencesError('');
+      return;
+    }
+    const controller = new AbortController();
+    setEvidencesLoading(true);
+    setEvidencesError('');
+    apiClient
+      .get<EvidenceRow[]>(`/payments/${active.id}/evidences`, {
+        token: session.accessToken,
+        isBearer: true,
+        signal: controller.signal,
+      })
+      .then((rows) => setEvidences(rows || []))
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        const msg =
+          err instanceof Error ? err.message : 'No se pudo cargar la evidencia';
+        setEvidencesError(msg);
+        setEvidences([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEvidencesLoading(false);
+      });
+    return () => controller.abort();
+  }, [session, active]);
 
   const openApprove = (p: PaymentRow) => {
     setActive(p);
@@ -247,10 +300,148 @@ export const StaffPayments = () => {
                 <strong>Enviado:</strong> {new Date(active.submittedAt).toLocaleString()}
               </div>
             )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '8px' }}>
-              La evidencia está registrada en el servidor. Si necesitas revisarla, pide al comprador
-              su código único y cruza contra el recibo bancario.
-            </p>
+            <div style={{ marginTop: '12px' }}>
+              <strong style={{ display: 'block', marginBottom: '8px' }}>
+                Evidencias ({evidences.length})
+              </strong>
+              {evidencesLoading && (
+                <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                  Cargando evidencias…
+                </p>
+              )}
+              {!evidencesLoading && evidencesError && (
+                <p style={{ color: 'var(--error)', margin: 0 }}>{evidencesError}</p>
+              )}
+              {!evidencesLoading && !evidencesError && evidences.length === 0 && (
+                <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                  No hay archivos adjuntos registrados para este pago.
+                </p>
+              )}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  marginTop: '8px',
+                }}
+              >
+                {evidences.map((ev) => {
+                  const isImage = (ev.mimeType || '').startsWith('image/');
+                  const isPdf = ev.mimeType === 'application/pdf';
+                  return (
+                    <div
+                      key={ev.id}
+                      className="glass-panel"
+                      style={{
+                        padding: '12px',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <FileText size={16} />
+                          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+                            {ev.fileName || ev.evidenceType}
+                          </span>
+                        </div>
+                        <span
+                          style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
+                        >
+                          {ev.mimeType || 'desconocido'}
+                          {ev.sizeBytes ? ` · ${formatSize(ev.sizeBytes)}` : ''}
+                          {ev.createdAt
+                            ? ` · ${new Date(ev.createdAt).toLocaleString()}`
+                            : ''}
+                        </span>
+                      </div>
+                      {isImage && (
+                        <a
+                          href={ev.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={ev.fileUrl}
+                            alt={ev.fileName || 'Evidencia'}
+                            style={{
+                              width: '100%',
+                              maxHeight: '320px',
+                              objectFit: 'contain',
+                              borderRadius: 'var(--radius-sm)',
+                              background: '#000',
+                            }}
+                          />
+                        </a>
+                      )}
+                      {isPdf && (
+                        <iframe
+                          src={ev.fileUrl}
+                          title={ev.fileName || 'Evidencia PDF'}
+                          style={{
+                            width: '100%',
+                            height: '360px',
+                            border: '1px solid var(--border-light)',
+                            borderRadius: 'var(--radius-sm)',
+                            background: '#000',
+                          }}
+                        />
+                      )}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '12px',
+                          alignItems: 'center',
+                          fontSize: '0.8rem',
+                        }}
+                      >
+                        <a
+                          href={ev.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            gap: '6px',
+                            alignItems: 'center',
+                            color: 'var(--accent-primary)',
+                          }}
+                        >
+                          <ExternalLink size={14} /> Abrir / descargar
+                        </a>
+                        {ev.storagePath && (
+                          <code
+                            style={{
+                              color: 'var(--text-muted)',
+                              fontSize: '0.75rem',
+                              wordBreak: 'break-all',
+                            }}
+                            title="Ruta en Firebase Storage"
+                          >
+                            {ev.storagePath}
+                          </code>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
               <Button variant="secondary" onClick={() => openReject(active)}>
                 Rechazar

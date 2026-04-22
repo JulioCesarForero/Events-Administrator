@@ -17,6 +17,9 @@ def get_engine():
         _engine = create_engine(
             settings.database_url,
             pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=2,
+            pool_recycle=1800,
             echo=settings.debug,
         )
         _session_factory = sessionmaker(

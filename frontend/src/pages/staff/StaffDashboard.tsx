@@ -12,11 +12,15 @@ export const StaffDashboard = () => {
 
   useEffect(() => {
     if (session) {
-      if (!session.tenantId) {
+      if (!session.tenantId || !session.role) {
         apiClient.get<any>('/auth/me', { token: session.accessToken, isBearer: true })
           .then(res => {
-             const tId = res.memberships?.[0]?.tenantId || '';
-             setSession({ ...session, tenantId: tId });
+             const m = res.memberships?.[0];
+             setSession({
+               ...session,
+               tenantId: m?.tenantId || '',
+               role: m?.role || '',
+             });
           }).catch(console.error);
       } else {
         loadEvents();
@@ -52,14 +56,29 @@ export const StaffDashboard = () => {
     );
   }
 
+  const isAdmin = session.role === 'ADMIN' || session.role === 'OWNER';
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ margin: 0 }}>Panel General</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>Bienvenido, {session.email}</p>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            Bienvenido, {session.email}
+            {session.role ? ` · Rol ${session.role}` : ''}
+          </p>
         </div>
-        <Button variant="outline" onClick={logout}>Cerrar Sesión</Button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {isAdmin && (
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/staff/admin/staff-users')}
+            >
+              Gestión de Staff
+            </Button>
+          )}
+          <Button variant="outline" onClick={logout}>Cerrar Sesión</Button>
+        </div>
       </div>
 
       <h3 style={{ marginTop: '20px' }}>Mis Eventos</h3>
@@ -76,10 +95,19 @@ export const StaffDashboard = () => {
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                <Button size="sm" onClick={() => navigate(`/staff/events/${ev.id}/payments`)}>Revisión Pagos</Button>
                <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/students`)}>Estudiantes</Button>
-               <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/map`)}>Ver Mapa</Button>
+               <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/map`)}>Diseño de Plano</Button>
                <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/policies`)}>Políticas</Button>
                <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/manual-adjustments`)}>Ajustes</Button>
                <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/audit`)}>Auditoría</Button>
+               {isAdmin && (
+                 <Button
+                   size="sm"
+                   variant="secondary"
+                   onClick={() => navigate(`/staff/events/${ev.id}/staff`)}
+                 >
+                   Staff del evento
+                 </Button>
+               )}
             </div>
           </GlassCard>
         ))}

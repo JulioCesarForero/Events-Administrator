@@ -52,6 +52,12 @@ export interface StaffSession {
   userId: string;
   email: string;
   tenantId?: string;
+  /**
+   * Role of the user on their primary tenant membership.
+   * `ADMIN` / `OWNER` unlock the tenant-admin CRUD for StaffUsers and
+   * per-event assignments.
+   */
+  role?: string;
 }
 
 interface AuthStaffContextType {

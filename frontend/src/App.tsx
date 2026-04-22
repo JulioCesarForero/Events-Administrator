@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Palette } from 'lucide-react';
+import {
+  LegalViewerModal,
+  type LegalDocumentType,
+} from './components/ui/LegalViewerModal';
 import { PortalCodeLogin } from './pages/portal/PortalCodeLogin';
 import { PortalDashboard } from './pages/portal/PortalDashboard';
 import { PortalAttendees } from './pages/portal/PortalAttendees';
@@ -17,7 +21,13 @@ import { StaffMap } from './pages/staff/StaffMap';
 import { StaffEventWizard } from './pages/staff/StaffEventWizard';
 import { StaffManualAdjustments } from './pages/staff/StaffManualAdjustments';
 import { StaffAudit } from './pages/staff/StaffAudit';
-import { RequireBuyerAuth, RequireStaffAuth } from './router/guards';
+import { AdminStaffUsers } from './pages/staff/AdminStaffUsers';
+import { AdminEventStaff } from './pages/staff/AdminEventStaff';
+import {
+  RequireBuyerAuth,
+  RequireStaffAuth,
+  RequireTenantAdmin,
+} from './router/guards';
 
 function ThemeSelector() {
   const [theme, setTheme] = useState<string>(() => {
@@ -98,6 +108,64 @@ function ThemeSelector() {
 }
 
 // Pantallas placeholder de Layouts
+const PortalLegalFooter = () => {
+  const { eventId } = useParams();
+  const [legalType, setLegalType] = useState<LegalDocumentType | null>(null);
+  if (!eventId) return null;
+  return (
+    <footer
+      style={{
+        padding: '16px 20px 24px',
+        display: 'flex',
+        gap: '16px',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+        fontSize: '0.8rem',
+        color: 'var(--text-muted)',
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setLegalType('DATA_POLICY')}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+          textDecoration: 'underline',
+          padding: 0,
+          font: 'inherit',
+        }}
+      >
+        Política de tratamiento de datos
+      </button>
+      <button
+        type="button"
+        onClick={() => setLegalType('EVENT_TERMS')}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+          textDecoration: 'underline',
+          padding: 0,
+          font: 'inherit',
+        }}
+      >
+        Términos y condiciones
+      </button>
+      {legalType && (
+        <LegalViewerModal
+          eventId={eventId}
+          documentType={legalType}
+          open={legalType !== null}
+          onClose={() => setLegalType(null)}
+        />
+      )}
+    </footer>
+  );
+};
+
 const PortalLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="bg-grid animate-fade-in" style={{ minHeight: '100vh', position: 'relative' }}>
@@ -109,6 +177,7 @@ const PortalLayout = ({ children }: { children: React.ReactNode }) => {
       <main style={{ padding: '0 20px 40px' }}>
         {children}
       </main>
+      <PortalLegalFooter />
     </div>
   );
 };
@@ -166,6 +235,26 @@ export default function App() {
               <Route path="events/:eventId/map" element={<RequireStaffAuth><StaffMap /></RequireStaffAuth>} />
               <Route path="events/:eventId/manual-adjustments" element={<RequireStaffAuth><StaffManualAdjustments /></RequireStaffAuth>} />
               <Route path="events/:eventId/audit" element={<RequireStaffAuth><StaffAudit /></RequireStaffAuth>} />
+              <Route
+                path="admin/staff-users"
+                element={
+                  <RequireStaffAuth>
+                    <RequireTenantAdmin>
+                      <AdminStaffUsers />
+                    </RequireTenantAdmin>
+                  </RequireStaffAuth>
+                }
+              />
+              <Route
+                path="events/:eventId/staff"
+                element={
+                  <RequireStaffAuth>
+                    <RequireTenantAdmin>
+                      <AdminEventStaff />
+                    </RequireTenantAdmin>
+                  </RequireStaffAuth>
+                }
+              />
               <Route path="" element={<Navigate to="login" />} />
             </Routes>
           </StaffLayout>

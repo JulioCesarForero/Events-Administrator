@@ -6,7 +6,9 @@ import { Modal } from '../../components/ui/Modal';
 import { apiClient } from '../../api/client';
 import { ArrowLeft, CheckCircle2, Minus, Plus, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { EventMap } from '../../components/ui/EventMap';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import type { MapTable } from '../../api/types';
 
 interface LegalDoc {
   id: string;
@@ -18,19 +20,7 @@ interface LegalDoc {
   publishedAt?: string | null;
 }
 
-interface MapTable {
-  id?: string;
-  layoutTableId?: string;
-  code: string;
-  capacity: number;
-  occupiedSpots?: number;
-  availableSpots?: number;
-  occupied?: number;
-  available?: number;
-  status?: 'AVAILABLE' | 'LIMITED' | 'FULL' | string;
-  position?: { x?: number; y?: number; rotationDeg?: number };
-  positionJson?: Record<string, unknown> | null;
-}
+// MapTable imported from types
 
 interface MyGroup {
   groupId: string;
@@ -65,32 +55,6 @@ function tableAvailable(t: MapTable): number {
   if (typeof t.available === 'number') return t.available;
   return Math.max(0, (t.capacity || 0) - (t.occupiedSpots ?? t.occupied ?? 0));
 }
-
-function tablePosition(t: MapTable): { x: number; y: number } {
-  if (t.position && typeof t.position.x === 'number') {
-    return { x: t.position.x, y: t.position.y ?? 0 };
-  }
-  const pj = (t.positionJson || {}) as { x?: number; y?: number };
-  return { x: Number(pj.x || 0), y: Number(pj.y || 0) };
-}
-
-function semaphoreColor(t: MapTable): { fill: string; border: string; label: string } {
-  const avail = tableAvailable(t);
-  if (avail <= 0) return { fill: 'rgba(255,0,0,0.18)', border: 'var(--error)', label: 'Sin cupos' };
-  const ratio = t.capacity > 0 ? avail / t.capacity : 0;
-  if (ratio <= 0.2)
-    return {
-      fill: 'rgba(255,193,7,0.18)',
-      border: '#FFC107',
-      label: 'Cupos limitados',
-    };
-  return {
-    fill: 'rgba(57,255,20,0.14)',
-    border: 'var(--accent-primary)',
-    label: 'Disponible',
-  };
-}
-
 export const PortalMap = () => {
   const { session } = useAuthPortal();
   const navigate = useNavigate();
@@ -124,10 +88,12 @@ export const PortalMap = () => {
             `/events/${session.eventId}/map`,
             token,
           ),
-          apiClient.get<LegalDoc[]>(
-            `/events/${session.eventId}/legal-documents`,
-            token,
-          ).catch(() => [] as LegalDoc[]),
+          apiClient
+            .get<LegalDoc[]>(
+              `/portal/events/${session.eventId}/published-legal-documents`,
+              { signal: controller.signal },
+            )
+            .catch(() => [] as LegalDoc[]),
         ]);
         setGroup(groupRes);
         setMapData(mapRes);
@@ -254,87 +220,34 @@ export const PortalMap = () => {
             style={{
               position: 'relative',
               width: '100%',
-              minHeight: '400px',
+              minHeight: '500px',
               border: '1px solid var(--border-light)',
               borderRadius: 'var(--radius-md)',
-              padding: '12px',
+              padding: '0px',
+              overflow: 'hidden'
             }}
           >
-            {tables.map((t) => {
-              const tid = tableId(t);
-              const avail = tableAvailable(t);
-              const selected = selectedSpots[tid] || 0;
-              const sem = semaphoreColor(t);
-              const pos = tablePosition(t);
-              return (
-                <div
-                  key={tid}
-                  style={{
-                    position: 'absolute',
-                    left: `${pos.x}px`,
-                    top: `${pos.y}px`,
-                    width: '78px',
-                    padding: '6px 6px 4px',
-                    borderRadius: 'var(--radius-md)',
-                    background: selected > 0 ? 'rgba(57,255,20,0.25)' : sem.fill,
-                    border: `2px solid ${selected > 0 ? 'var(--accent-primary)' : sem.border}`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '4px',
-                    textAlign: 'center',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <strong style={{ fontSize: '0.95rem' }}>{t.code}</strong>
-                  <small style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                    {avail}/{t.capacity}
-                  </small>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <button
-                      onClick={() => setSpots(tid, (selectedSpots[tid] || 0) - 1, avail)}
-                      disabled={!selected}
-                      aria-label={`Quitar cupo en mesa ${t.code}`}
-                      style={{
-                        border: 'none',
-                        background: 'rgba(255,255,255,0.12)',
-                        color: 'var(--text-primary)',
-                        width: 22,
-                        height: 22,
-                        borderRadius: '50%',
-                        cursor: selected ? 'pointer' : 'not-allowed',
-                      }}
-                    >
-                      <Minus size={12} />
-                    </button>
-                    <span style={{ minWidth: '14px', textAlign: 'center', fontSize: '0.85rem' }}>
-                      {selected}
-                    </span>
-                    <button
-                      onClick={() => setSpots(tid, (selectedSpots[tid] || 0) + 1, avail)}
-                      disabled={avail <= 0 || totalAssigned >= approved}
-                      aria-label={`Agregar cupo en mesa ${t.code}`}
-                      style={{
-                        border: 'none',
-                        background: 'var(--accent-primary)',
-                        color: '#000',
-                        width: 22,
-                        height: 22,
-                        borderRadius: '50%',
-                        cursor: avail > 0 && totalAssigned < approved ? 'pointer' : 'not-allowed',
-                      }}
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {tables.length === 0 && !loadError && (
+            {tables.length > 0 ? (
+              <EventMap 
+                tables={tables}
+                isAdmin={false}
+                selectedSpots={selectedSpots}
+                onTableClick={(t) => {
+                  const tid = t.id || t.layoutTableId || '';
+                  const avail = Math.max(0, (t.capacity || 0) - (t.occupiedSpots ?? t.occupied ?? 0));
+                  // If they click on it, and it's not selected, we select +1. If selected > 0, maybe they want to add more?
+                  // To keep UI simple, let's keep the +/- buttons in the list. On Map click, if 0, assign 1 if possible.
+                  const currentSelected = selectedSpots[tid] || 0;
+                  if (currentSelected === 0 && avail > 0 && totalAssigned < approved) {
+                    setSpots(tid, 1, avail);
+                  }
+                }}
+              />
+            ) : !loadError ? (
               <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '120px' }}>
                 Cargando mesas...
               </p>
-            )}
+            ) : null}
           </div>
         </GlassCard>
 
@@ -353,18 +266,43 @@ export const PortalMap = () => {
               <ul style={{ listStyle: 'none', padding: 0, marginTop: '12px' }}>
                 {Object.entries(selectedSpots).map(([tid, spots]) => {
                   const table = tables.find((t) => tableId(t) === tid);
+                  const avail = tableAvailable(table!);
                   return (
                     <li
                       key={tid}
                       style={{
                         display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '8px 0',
+                        padding: '12px 0',
                         borderBottom: '1px solid var(--border-light)',
                       }}
                     >
                       <span>Mesa {table?.code || tid.slice(0, 6)}</span>
-                      <strong>{spots} cupo(s)</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                         <button
+                            onClick={() => setSpots(tid, spots - 1, avail)}
+                            style={{
+                              border: '1px solid var(--border-focus)',
+                              background: 'transparent',
+                              color: 'var(--text-primary)',
+                              width: 26, height: 26, borderRadius: '50%',
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                          ><Minus size={14}/></button>
+                         <strong style={{ minWidth: '18px', textAlign: 'center' }}>{spots}</strong>
+                         <button
+                            onClick={() => setSpots(tid, spots + 1, avail)}
+                            disabled={avail <= 0 || totalAssigned >= approved}
+                            style={{
+                              border: 'none',
+                              background: avail > 0 && totalAssigned < approved ? 'var(--accent-primary)' : 'var(--border-light)',
+                              color: '#000',
+                              width: 26, height: 26, borderRadius: '50%',
+                              cursor: avail > 0 && totalAssigned < approved ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                          ><Plus size={14}/></button>
+                      </div>
                     </li>
                   );
                 })}

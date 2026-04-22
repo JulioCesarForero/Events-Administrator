@@ -222,6 +222,7 @@ Archivo canónico: [`.env.example`](.env.example). Cargado por docker compose y 
 | Observabilidad | `DEBUG`, `LOG_LEVEL`, `CORS_ORIGINS` |
 | Idempotencia | `REDIS_URL` (vacío = in-memory), `IDEMPOTENCY_TTL_SECONDS` |
 | Frontend build-time | `VITE_API_BASE_URL`, `VITE_API_PROXY_TARGET`, `VITE_API_TIMEOUT_MS`, `VITE_EVIDENCE_STORAGE`, `VITE_EVIDENCE_MAX_MB` |
+| Firebase (storage de soporte de pago) | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MESSAGING_SENDER_ID` |
 
 Las variables `VITE_*` se inyectan al `frontend.Dockerfile` como `ARG` y quedan **horneadas** en el bundle estático. Para cambiarlas, rebuilda la imagen del frontend.
 
@@ -239,9 +240,39 @@ Las variables `VITE_*` se inyectan al `frontend.Dockerfile` como `ARG` y quedan 
 | `PAYMENT_NOT_APPROVED` al reservar | Pago no aprobado por comité | Aprueba desde `/staff/events/{id}/payments` |
 | `STAGE_LIMIT_EXCEEDED` | Pides más boletas que el tope de etapa | Ajusta `maxPresaleTickets` / `maxSaleTickets` o reduce cantidad |
 | Rate limit en `code-login`/`staff-login` | 10 intentos en 15 min | Espera `Retry-After` segundos o cambia IP |
-| Subida de evidencia falla | `VITE_EVIDENCE_STORAGE=signed` sin backing store real | Cambia a `inline` para MVP y rebuilda frontend |
+| Subida de evidencia falla | `VITE_EVIDENCE_STORAGE=signed` sin backing store real | Deja `VITE_EVIDENCE_STORAGE=firebase` y configura las variables `VITE_FIREBASE_*` (ver §10). Como fallback de emergencia existe `inline` (base64 en DB). |
 
-## 9. Documentación adicional
+## 9. Firebase Storage (soporte de pago)
+
+El flujo de subida de comprobantes usa **Firebase Storage** directamente desde el navegador. Los archivos se organizan en `payment-evidence/{eventId}/{groupId}/{paymentId}/{timestamp}_{fileName}` y el backend sólo guarda la `download URL` + metadatos (`storagePath`, `fileName`, `sizeBytes`, `mimeType`) en la tabla `events.payment_evidence`.
+
+Pasos para activarlo:
+
+1. En [Firebase Console](https://console.firebase.google.com/): crea (o reutiliza) el proyecto, habilita **Storage** y habilita **Authentication → Sign-in method → Anonymous** (el portal hace `signInAnonymously` antes de subir).
+2. Copia las claves del web app a tus variables locales:
+
+   ```bash
+   VITE_FIREBASE_API_KEY=...
+   VITE_FIREBASE_AUTH_DOMAIN=...
+   VITE_FIREBASE_PROJECT_ID=...
+   VITE_FIREBASE_STORAGE_BUCKET=...
+   VITE_FIREBASE_APP_ID=...
+   VITE_FIREBASE_MESSAGING_SENDER_ID=...
+   ```
+
+3. Despliega las reglas de [`frontend/storage.rules`](frontend/storage.rules): `firebase deploy --only storage` desde el directorio `frontend/`.
+4. El staff ve el archivo directamente en el modal de detalle de pagos (`/staff/events/{eventId}/payments`), con preview en imagen/PDF y link de descarga.
+
+## 9.1. Gestión de Staff por evento (admin)
+
+Los usuarios con rol `ADMIN` u `OWNER` en un tenant cuentan con dos pantallas dedicadas:
+
+- `/staff/admin/staff-users`: alta de personal del Staff (email + contraseña temporal + rol `ADMIN`/`STAFF`), reseteo de contraseña y activar/desactivar.
+- `/staff/events/:eventId/staff`: asignar/quitar StaffUsers existentes al evento concreto, con roles `ORGANIZER`, `CASHIER`, `REVIEWER`, `COORDINATOR`.
+
+En el backend estos flujos viven en `modules/staff_admin/api/router.py` y están protegidos por `ensure_tenant_admin` (helper en `shared/api/deps.py`). El acceso por evento sigue usando `EventOrganizerAssignment` + `UserTenantMembership` a través de `ensure_event_staff_access`, por lo que el staff asignado automáticamente hereda acceso a `/events/{id}/*` protegidos.
+
+## 10. Documentación adicional
 
 - **Producto**: [`PromptsDiseñoApp/`](PromptsDiseñoApp/) — casos de uso, contratos REST, UX, reglas, motor de asignación.
 - **Arquitectura técnica**: [`backend-api/docs/architecture.md`](backend-api/docs/architecture.md).
@@ -251,7 +282,7 @@ Las variables `VITE_*` se inyectan al `frontend.Dockerfile` como `ARG` y quedan 
 - **API contract resumen**: [`docs/api-contract.md`](docs/api-contract.md).
 - **Data model**: [`data-model/README.md`](data-model/README.md).
 
-## 10. Flujo de ramas
+## 11. Flujo de ramas
 
 - `main`: producción (protegida)
 - `develop`: integración

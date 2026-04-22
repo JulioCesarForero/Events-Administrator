@@ -84,6 +84,25 @@ def ensure_event_staff_access(db: Session, staff: StaffUser, event_id: UUID) -> 
     return ev
 
 
+TENANT_ADMIN_ROLES = ("ADMIN", "OWNER")
+
+
+def ensure_tenant_admin(
+    db: Session, staff: StaffUser, tenant_id: UUID
+) -> UserTenantMembership:
+    m = db.execute(
+        select(UserTenantMembership).where(
+            UserTenantMembership.user_id == staff.id,
+            UserTenantMembership.tenant_id == tenant_id,
+        )
+    ).scalar_one_or_none()
+    if m is None or m.role not in TENANT_ADMIN_ROLES:
+        raise HTTPException(
+            status_code=403, detail="Tenant admin role required"
+        )
+    return m
+
+
 def buyer_group_id(claims: dict) -> UUID:
     return UUID(claims["sub"])
 

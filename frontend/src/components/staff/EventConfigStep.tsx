@@ -67,9 +67,8 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
           venueName: wizardData.venueName || undefined,
        }, { token: sessionToken, isBearer: true });
 
-       alert('¡Evento creado, publicado y configurado exitosamente!');
-       navigate('/staff/dashboard');
-
+       // Remove the alert and navigation, we'll handle this in the UI
+       setSuccessEventId(newEventId);
     } catch (err: any) {
        console.error("Event creation error:", err);
        alert(`Error creando el Evento: ${err?.message || JSON.stringify(err)}`);
@@ -77,6 +76,25 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
       setLoading(false);
     }
   };
+
+  const [successEventId, setSuccessEventId] = useState<string | null>(null);
+
+  if (successEventId) {
+    return (
+      <div className="animate-slide-up" style={{ textAlign: 'center', padding: '40px 20px' }}>
+         <Rocket size={48} color="var(--success)" style={{ margin: '0 auto 20px' }} />
+         <h2>¡Evento Creado y Publicado!</h2>
+         <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
+           El salón fue enlazado exitosamente con mesas base autogeneradas.
+           Ahora puedes proceder a personalizar la distribución de mesas, añadir tarimas, pistas de baile y más.
+         </p>
+         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+           <Button variant="outline" onClick={() => navigate('/staff/dashboard')}>Ir al Dashboard</Button>
+           <Button onClick={() => navigate(`/staff/events/${successEventId}/map`)}>Distribuir Mesas Ahora →</Button>
+         </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-slide-up">

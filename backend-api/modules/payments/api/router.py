@@ -368,6 +368,9 @@ class EvidenceRegister(CamelModel):
     file_url: str
     mime_type: str | None = None
     evidence_type: str = Field(default="RECEIPT", max_length=64)
+    storage_path: str | None = None
+    file_name: str | None = Field(default=None, max_length=300)
+    size_bytes: int | None = Field(default=None, ge=0)
 
 
 @router.post("/payments/{payment_id}/evidence", response_model=dict)
@@ -387,7 +390,42 @@ def register_evidence(
         mime_type=body.mime_type,
         evidence_type=body.evidence_type,
         uploaded_by_actor_type="BUYER",
+        storage_path=body.storage_path,
+        file_name=body.file_name,
+        size_bytes=body.size_bytes,
     )
     db.add(ev)
     db.flush()
     return {"id": str(ev.id)}
+
+
+class EvidenceOut(CamelOrmModel):
+    id: UUID
+    payment_id: UUID
+    file_url: str
+    mime_type: str | None = None
+    evidence_type: str
+    uploaded_by_actor_type: str
+    storage_path: str | None = None
+    file_name: str | None = None
+    size_bytes: int | None = None
+    created_at: datetime
+
+
+@router.get("/payments/{payment_id}/evidences", response_model=list[EvidenceOut])
+def list_payment_evidences(
+    payment_id: UUID,
+    db: DbSession,
+    staff: StaffUserDep,
+) -> list[PaymentEvidence]:
+    p = db.get(Payment, payment_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    ensure_event_staff_access(db, staff, p.event_id)
+    return list(
+        db.execute(
+            select(PaymentEvidence)
+            .where(PaymentEvidence.payment_id == payment_id)
+            .order_by(PaymentEvidence.created_at.desc())
+        ).scalars()
+    )

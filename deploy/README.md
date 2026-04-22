@@ -1,0 +1,302 @@
+# Despliegue en Google Cloud
+
+Guía paso a paso para desplegar **Events Administrator** usando:
+
+- **Cloud Run** → Backend FastAPI
+- **Firebase Hosting** → Frontend React SPA
+- **Neon PostgreSQL** → Base de datos (free tier)
+
+## Arquitectura
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Firebase Hosting                │
+│         (CDN global · dominio .web.app)          │
+│                                                  │
+│  /assets, /index.html  →  static files (dist/)  │
+│  /api/**               →  Cloud Run (rewrite)   │
+│  /**                   →  /index.html (SPA)     │
+└──────────────────────┬──────────────────────────┘
+                       │ /api/**
+                       ▼
+              ┌─────────────────┐
+              │    Cloud Run     │
+              │  (FastAPI +      │
+              │   Gunicorn)      │
+              │  .run.app        │
+              └────────┬────────┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │  Neon PostgreSQL │
+              │  (serverless)    │
+              │  free tier       │
+              └─────────────────┘
+```
+
+---
+
+## Prerrequisitos
+
+1. **Cuenta GCP** con billing activo
+2. **gcloud CLI** instalado y autenticado
+3. **Node.js 20+** y **npm**
+4. **Firebase CLI**: `npm install -g firebase-tools`
+5. **psql** (opcional, para ejecutar DDL contra Neon)
+
+---
+
+## Paso 1: Crear proyecto GCP y configurar gcloud
+
+```powershell
+# Autenticarse (abre el navegador)
+gcloud auth login
+
+# Crear proyecto (o usar uno existente)
+gcloud projects create events-admin-prod --name="Events Administrator"
+
+# Establecer como proyecto activo
+gcloud config set project events-admin-prod
+
+# Habilitar APIs necesarias
+gcloud services enable run.googleapis.com
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable artifactregistry.googleapis.com
+```
+
+> **Nota**: Reemplaza `events-admin-prod` con un ID único para tu proyecto.
+
+---
+
+## Paso 2: Crear base de datos en Neon
+
+1. Ve a [https://neon.tech](https://neon.tech) y crea una cuenta gratuita.
+2. Crea un nuevo proyecto:
+   - **Name**: `events-administrator`
+   - **Region**: `US East (Ohio)` o la más cercana a `us-central1`
+   - **PostgreSQL version**: `16`
+3. Copia el **connection string** (pooled). Se ve así:
+   ```
+   postgresql://neondb_owner:PASSWORD@ep-xxxx-xxxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+   ```
+4. **Importante**: Usa la variante **pooled** (el hostname contiene `-pooler`).
+
+---
+
+## Paso 3: Ejecutar DDL contra Neon
+
+Necesitas `psql` instalado localmente. Si no lo tienes, puedes usar el **SQL Editor** en la consola web de Neon.
+
+### Opción A: Con psql local
+
+```powershell
+# Desde la raíz del proyecto
+$env:PGHOST = "ep-xxxx-xxxx-pooler.us-east-2.aws.neon.tech"
+$env:PGPORT = "5432"
+$env:PGUSER = "neondb_owner"
+$env:PGDATABASE = "neondb"
+$env:PGPASSWORD = "TU_PASSWORD"
+$env:PGSSLMODE = "require"
+
+# Ejecutar todos los scripts SQL en orden
+& .\data-model\scripts\run_all.ps1
+```
+
+### Opción B: Desde la consola web de Neon
+
+1. Abre tu proyecto en [console.neon.tech](https://console.neon.tech)
+2. Ve a **SQL Editor**
+3. Copia y pega el contenido de cada archivo SQL en orden:
+   - `data-model/scripts/01_schema/*.sql`
+   - `data-model/scripts/02_tables/*.sql`
+   - `data-model/scripts/03_constraints/*.sql`
+   - `data-model/scripts/04_indexes/*.sql`
+   - `data-model/scripts/05_seed/*.sql`
+   - `data-model/scripts/06_views/*.sql`
+   - `data-model/scripts/07_functions/*.sql`
+
+---
+
+## Paso 4: Desplegar Backend a Cloud Run
+
+```powershell
+# Desde la raíz del proyecto.
+# Reemplaza los valores de las variables de entorno.
+
+# La connection string de Neon para SQLAlchemy (agrega +psycopg al driver):
+# postgresql+psycopg://user:pass@host/db?sslmode=require
+
+gcloud run deploy events-backend `
+  --source ./backend-api `
+  --region us-central1 `
+  --allow-unauthenticated `
+  --port 8080 `
+  --memory 512Mi `
+  --cpu 1 `
+  --min-instances 0 `
+  --max-instances 3 `
+  --set-env-vars "DATABASE_URL=postgresql+psycopg://USER:PASS@HOST/DB?sslmode=require" `
+  --set-env-vars "JWT_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" `
+  --set-env-vars "JWT_ISSUER=events-administrator" `
+  --set-env-vars "JWT_STAFF_AUDIENCE=staff" `
+  --set-env-vars "JWT_BUYER_AUDIENCE=buyer" `
+  --set-env-vars "JWT_ACCESS_TTL_MINUTES=60" `
+  --set-env-vars "ROOT_PATH=/api" `
+  --set-env-vars "DEBUG=true" `
+  --set-env-vars "CORS_ORIGINS=*" `
+  --set-env-vars "LOG_LEVEL=INFO" `
+  --set-env-vars "REDIS_URL=" `
+  --set-env-vars "IDEMPOTENCY_TTL_SECONDS=3600"
+```
+
+> **Importante**: Reemplaza `USER`, `PASS`, `HOST`, `DB` con los valores reales de tu Neon connection string. Asegúrate de que el prefijo sea `postgresql+psycopg://` (NO `postgresql://`).
+
+### Verificar el backend
+
+```powershell
+# Obtener la URL del servicio
+$BACKEND_URL = gcloud run services describe events-backend --region us-central1 --format "value(status.url)"
+
+# Health check
+curl "$BACKEND_URL/health/live"
+# → {"status":"ok"}
+
+# Readiness (verifica conexión a Neon)
+curl "$BACKEND_URL/health/ready"
+# → {"status":"ready","db":"ok"}
+```
+
+---
+
+## Paso 5: Configurar Firebase y desplegar Frontend
+
+### 5.1 Inicializar Firebase
+
+```powershell
+# Autenticarse con Firebase
+firebase login
+
+# Desde la raíz del proyecto, vincular con el proyecto GCP
+cd frontend
+firebase projects:list  # Verifica que tu proyecto GCP aparece
+
+# Crear la app de Firebase (usar el mismo project ID de GCP)
+firebase use --add events-admin-prod
+```
+
+El archivo `firebase.json` ya está creado con los rewrites necesarios. El rewrite `/api/**` redirige automáticamente al servicio `events-backend` en Cloud Run.
+
+### 5.2 Build del frontend
+
+```powershell
+# Dentro de frontend/
+# VITE_API_BASE_URL=/api/v1 (idéntico a local, Firebase hace el proxy)
+$env:VITE_API_BASE_URL = "/api/v1"
+$env:VITE_API_TIMEOUT_MS = "20000"
+$env:VITE_EVIDENCE_STORAGE = "inline"
+$env:VITE_EVIDENCE_MAX_MB = "5"
+
+npm run build
+```
+
+### 5.3 Desplegar a Firebase Hosting
+
+```powershell
+# Dentro de frontend/
+firebase deploy --only hosting
+```
+
+La salida te dará la URL:
+```
+✔ Hosting URL: https://events-admin-prod.web.app
+```
+
+---
+
+## Paso 6: Verificación
+
+### Health checks
+
+```powershell
+$URL = "https://events-admin-prod.web.app"
+
+# Frontend carga
+curl -I "$URL/"
+
+# API health a través de Firebase rewrite
+curl "$URL/api/health/live"
+
+# DB connectivity
+curl "$URL/api/health/ready"
+```
+
+### Crear usuario staff de prueba
+
+```powershell
+curl -X POST "$URL/api/v1/auth/staff-register" `
+  -H "Content-Type: application/json" `
+  -d '{"email":"admin@events.local","password":"admin123","displayName":"Admin","tenantName":"Mi Colegio"}'
+```
+
+### Login y explorar
+
+```powershell
+$TOKEN = (curl -s -X POST "$URL/api/v1/auth/staff-login" `
+  -H "Content-Type: application/json" `
+  -d '{"email":"admin@events.local","password":"admin123"}' | ConvertFrom-Json).accessToken
+
+curl -s "$URL/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Checklist post-deploy
+
+- [ ] Health check `/api/health/live` devuelve `{"status":"ok"}`
+- [ ] Health check `/api/health/ready` devuelve `{"status":"ready","db":"ok"}`
+- [ ] Frontend carga en `https://TU-PROYECTO.web.app/`
+- [ ] Login de staff funciona
+- [ ] Swagger accesible en `/api/docs` (solo si `DEBUG=true`)
+- [ ] Crear un evento de prueba
+- [ ] Importar CSV de estudiantes
+
+---
+
+## Costos estimados (mensual)
+
+| Servicio | Costo |
+|---|---|
+| Cloud Run | **$0** (free tier: 2M requests, 180K vCPU-s) |
+| Firebase Hosting | **$0** (10 GB storage, 360 MB/day transfer) |
+| Neon PostgreSQL | **$0** (free tier: 0.5 GB, 100 compute-hours) |
+| Cloud Build | **$0** (120 min/day free) |
+| **Total** | **$0/mes** para tráfico bajo-medio |
+
+---
+
+## Redespliegue rápido
+
+### Backend (cuando cambies código Python)
+```powershell
+gcloud run deploy events-backend --source ./backend-api --region us-central1
+```
+
+### Frontend (cuando cambies código React)
+```powershell
+cd frontend
+npm run build
+firebase deploy --only hosting
+```
+
+---
+
+## Troubleshooting
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| `502` en `/api/*` | Backend Cloud Run no desplegado o caído | `gcloud run services list` → verificar estado |
+| `ready` → 503 | Neon idle (cold start) o connection string mal | Verificar `DATABASE_URL`, esperar unos segundos y reintentar |
+| CORS errors | `CORS_ORIGINS` no incluye el dominio Firebase | Setear `CORS_ORIGINS=*` o `CORS_ORIGINS=https://tu-proyecto.web.app` |
+| `404` en rutas SPA | `firebase.json` mal configurado | Verificar que el rewrite `**` → `/index.html` está presente |
+| Build falla en Cloud Build | Dependencias / Dockerfile | `gcloud builds log` para ver el error detallado |
+| `MODULE_NOT_FOUND` en Cloud Run | `.gcloudignore` excluye archivos necesarios | Revisar qué se excluye |

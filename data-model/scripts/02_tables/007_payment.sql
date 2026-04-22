@@ -23,5 +23,12 @@ CREATE TABLE IF NOT EXISTS events.payment_evidence (
     mime_type VARCHAR(128),
     evidence_type VARCHAR(64) NOT NULL,
     uploaded_by_actor_type VARCHAR(32) NOT NULL,
+    storage_path TEXT,
+    file_name VARCHAR(300),
+    size_bytes BIGINT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE events.payment_evidence ADD COLUMN IF NOT EXISTS storage_path TEXT;
+ALTER TABLE events.payment_evidence ADD COLUMN IF NOT EXISTS file_name VARCHAR(300);
+ALTER TABLE events.payment_evidence ADD COLUMN IF NOT EXISTS size_bytes BIGINT;

@@ -6,15 +6,20 @@ import { Button } from '../../components/ui/Button';
 import { Key } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { useAuthPortal } from '../../contexts/AuthContext';
+import {
+  LegalViewerModal,
+  type LegalDocumentType,
+} from '../../components/ui/LegalViewerModal';
 
 export const PortalCodeLogin = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const { setSession } = useAuthPortal();
-  
+
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [legalType, setLegalType] = useState<LegalDocumentType | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +83,64 @@ export const PortalCodeLogin = () => {
           Verificar e Ingresar
         </Button>
       </form>
+
+      <div
+        style={{
+          marginTop: '24px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--border-light)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          alignItems: 'center',
+          fontSize: '0.85rem',
+        }}
+      >
+        <span style={{ color: 'var(--text-muted)' }}>
+          Antes de ingresar, revisa:
+        </span>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setLegalType('DATA_POLICY')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--accent-primary)',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              padding: 0,
+              font: 'inherit',
+            }}
+          >
+            Política de tratamiento de datos
+          </button>
+          <button
+            type="button"
+            onClick={() => setLegalType('EVENT_TERMS')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--accent-primary)',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              padding: 0,
+              font: 'inherit',
+            }}
+          >
+            Términos y condiciones
+          </button>
+        </div>
+      </div>
+
+      {eventId && legalType && (
+        <LegalViewerModal
+          eventId={eventId}
+          documentType={legalType}
+          open={legalType !== null}
+          onClose={() => setLegalType(null)}
+        />
+      )}
     </GlassCard>
   );
 };

@@ -1,0 +1,24 @@
+# Files to exclude from Cloud Build upload.
+.gcloudignore
+.git
+.gitignore
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+.venv
+.env
+.env.*
+.mypy_cache
+.ruff_cache
+
+# Test / dev files
+tests/
+docs/
+scripts/
+docker/
+
+# Config files not needed at runtime
+*.md
+pyproject.toml
+pytest.ini
