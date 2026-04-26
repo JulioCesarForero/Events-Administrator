@@ -158,6 +158,17 @@ $env:PGSSLMODE = "require"
 
 ## Paso 4: Desplegar Backend a Cloud Run
 
+### 4.0 Validar esquema antes de desplegar
+
+Antes del deploy, ejecuta una validación rápida de columnas requeridas para evitar errores `500` por drift entre modelo y base de datos:
+
+```powershell
+cd backend-api
+python scripts/check_schema.py
+```
+
+Si falla, aplica las migraciones SQL del proyecto y vuelve a ejecutar el chequeo.
+
 ```powershell
 # Desde la raíz del proyecto.
 # Reemplaza los valores de las variables de entorno.
@@ -185,7 +196,8 @@ gcloud run deploy events-backend `
   --set-env-vars "CORS_ORIGINS=*" `
   --set-env-vars "LOG_LEVEL=INFO" `
   --set-env-vars "REDIS_URL=" `
-  --set-env-vars "IDEMPOTENCY_TTL_SECONDS=3600"
+  --set-env-vars "IDEMPOTENCY_TTL_SECONDS=3600" `
+  --set-env-vars "SCHEMA_GUARD_MODE=fail"
 ```
 
 > **Importante**: Reemplaza `USER`, `PASS`, `HOST`, `DB` con los valores reales de tu Neon connection string. Asegúrate de que el prefijo sea `postgresql+psycopg://` (NO `postgresql://`).
@@ -204,6 +216,12 @@ curl "$BACKEND_URL/health/live"
 curl "$BACKEND_URL/health/ready"
 # → {"status":"ready","db":"ok"}
 ```
+
+`SCHEMA_GUARD_MODE=fail` hace que el contenedor no arranque si faltan columnas críticas. Modos válidos:
+
+- `off`: desactiva el chequeo
+- `warn`: registra advertencia y sigue arrancando
+- `fail`: bloquea arranque hasta corregir esquema (recomendado en prod)
 
 ---
 
