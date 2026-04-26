@@ -1,0 +1,110 @@
+.legal-md-block {
+  margin-top: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.legal-md-block h1,
+.legal-md-block h2,
+.legal-md-block h3,
+.legal-md-block h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.75em 0 0.4em;
+  color: var(--text-primary);
+}
+
+.legal-md-block h1 {
+  font-size: 1.1rem;
+}
+.legal-md-block h2 {
+  font-size: 1.05rem;
+}
+.legal-md-block h3,
+.legal-md-block h4 {
+  font-size: 1rem;
+}
+
+.legal-md-block h1:first-child,
+.legal-md-block h2:first-child,
+.legal-md-block h3:first-child,
+.legal-md-block h4:first-child,
+.legal-md-block p:first-child {
+  margin-top: 0;
+}
+
+.legal-md-block p {
+  margin: 0.5em 0;
+}
+
+.legal-md-block ul,
+.legal-md-block ol {
+  margin: 0.5em 0;
+  padding-left: 1.25em;
+}
+
+.legal-md-block li {
+  margin: 0.2em 0;
+}
+
+.legal-md-block a {
+  color: var(--accent-primary);
+  word-break: break-word;
+}
+
+.legal-md-block a:hover {
+  text-decoration: underline;
+}
+
+.legal-md-block code {
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.86em;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0.12em 0.4em;
+  border-radius: 4px;
+}
+
+.legal-md-block pre {
+  margin: 0.6em 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.45;
+}
+
+.legal-md-block pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.legal-md-block blockquote {
+  border-left: 3px solid var(--border-light);
+  margin: 0.5em 0;
+  padding: 0.1em 0 0.1em 0.75em;
+  color: var(--text-secondary);
+}
+
+.legal-md-block hr {
+  border: none;
+  border-top: 1px solid var(--border-light);
+  margin: 1em 0;
+}
+
+.legal-md-block strong {
+  font-weight: 600;
+}
+
+.legal-md-block--empty {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.9rem;
+}

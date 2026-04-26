@@ -16,6 +16,7 @@ from infrastructure.persistence.models import (
     StaffUser,
 )
 from infrastructure.security.jwt_tokens import decode_token
+from infrastructure.storage.signed_urls import generate_download_url
 from shared.api.deps import DbSession, ensure_event_staff_access, StaffUserDep
 
 router = APIRouter(tags=["map"])
@@ -109,6 +110,42 @@ def _map_tables(db, layout_id: UUID) -> list[MapTableOut]:
     return out
 
 
+def _resolve_effective_approved_payment(db, group: AttendeeGroup) -> Payment | None:
+    pay = db.get(Payment, group.current_payment_id) if group.current_payment_id else None
+    if pay is not None and pay.status == "APPROVED":
+        return pay
+    return (
+        db.execute(
+            select(Payment)
+            .where(
+                Payment.attendee_group_id == group.id,
+                Payment.event_id == group.event_id,
+                Payment.status == "APPROVED",
+            )
+            .order_by(Payment.approved_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+    )
+
+
+def _resolve_background_url(raw_url: str | None) -> str | None:
+    if not raw_url:
+        return None
+    if raw_url.startswith("gs://"):
+        _, path_part = raw_url.split("gs://", 1)
+        if "/" not in path_part:
+            return raw_url
+        bucket, object_key = path_part.split("/", 1)
+        return generate_download_url(bucket=bucket, object_key=object_key)
+    if raw_url.startswith("https://storage.googleapis.com/"):
+        path_part = raw_url.replace("https://storage.googleapis.com/", "", 1)
+        if "/" not in path_part:
+            return raw_url
+        bucket, object_key = path_part.split("/", 1)
+        return generate_download_url(bucket=bucket, object_key=object_key)
+    return raw_url
+
+
 @router.get("/events/{event_id}/map", response_model=MapEnvelope)
 def get_event_map(event_id: UUID, request: Request, db: DbSession) -> MapEnvelope:
     auth = request.headers.get("authorization")
@@ -150,13 +187,9 @@ def get_event_map(event_id: UUID, request: Request, db: DbSession) -> MapEnvelop
         if policy == "AFTER_PAYMENT_APPROVED":
             from domain.error_codes import PAYMENT_NOT_APPROVED
             from domain.exceptions import ValidationError as DomainValidation
-            if g.current_payment_id is None:
+            pay = _resolve_effective_approved_payment(db, g)
+            if pay is None:
                 raise DomainValidation("Map not visible until payment is approved", code=PAYMENT_NOT_APPROVED)
-            pay = db.get(Payment, g.current_payment_id)
-            if pay is None or pay.status != "APPROVED":
-                raise DomainValidation(
-                    "Map not visible until payment is approved", code=PAYMENT_NOT_APPROVED
-                )
         layout_id = _latest_binding(db, event_id).layout_id
 
     layout = db.get(Layout, layout_id)
@@ -164,7 +197,7 @@ def get_event_map(event_id: UUID, request: Request, db: DbSession) -> MapEnvelop
     return MapEnvelope(
         event_id=event_id,
         layout_id=layout_id,
-        background_image_url=layout.background_image_url if layout else None,
+        background_image_url=_resolve_background_url(layout.background_image_url) if layout else None,
         tables=_map_tables(db, layout_id),
     )
 
@@ -188,4 +221,7 @@ def update_layout_background(
     # In a more strict version, we'd check membership
     layout.background_image_url = body.background_image_url
     db.flush()
-    return {"status": "success", "background_image_url": layout.background_image_url}
+    return {
+        "status": "success",
+        "background_image_url": _resolve_background_url(layout.background_image_url),
+    }

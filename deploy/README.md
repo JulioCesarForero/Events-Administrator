@@ -362,25 +362,3 @@ firebase deploy --only hosting
 
 ---
 
-
-gcloud run deploy events-backend --source ./backend-api --region us-central1
-
-
-
-
-
----
-
-
-firebase hosting:sites:create events-admin-prod-2026 --project events-admin-prod-2026
-
-
-firebase target:apply hosting main events-admin-prod-2026 --project events-admin-prod-2026
-firebase deploy --only hosting:main --project events-admin-prod-2026
-
-
-
-firebase deploy --only hosting:main --project events-admin-prod-2026
-
----
-

@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from domain.error_codes import (
     EVENT_NO_LAYOUT_BINDING,
@@ -36,6 +37,36 @@ EVENT_TERMS = "EVENT_TERMS"
 class TableAllocation:
     layout_table_id: UUID
     spots: int
+
+
+def _next_reservation_sequence_number(db: Session, event_id: UUID) -> int:
+    """Return next sequence number using DB function with SQL fallback.
+
+    Production may run without the helper SQL function after partial migrations.
+    In that case, fallback to MAX+1 under a transaction-level advisory lock.
+    """
+    try:
+        seq = db.execute(
+            text("SELECT events.fn_next_reservation_sequence_number(:eid)"),
+            {"eid": event_id},
+        ).scalar_one()
+        return int(seq)
+    except SQLAlchemyError:
+        # Serialize fallback allocators per event to avoid duplicate sequences.
+        db.execute(
+            text(
+                "SELECT pg_advisory_xact_lock(("
+                "'x' || substr(md5(:eid), 1, 16)"
+                ")::bit(64)::bigint)"
+            ),
+            {"eid": str(event_id)},
+        )
+        seq = db.execute(
+            select(func.coalesce(func.max(ReservationCodeAssignment.code_sequence_number), 0) + 1).where(
+                ReservationCodeAssignment.event_id == event_id
+            )
+        ).scalar_one()
+        return int(seq)
 
 
 def create_reservation(
@@ -157,10 +188,7 @@ def create_reservation(
     seq_start: int | None = None
     seq_end: int | None = None
     for p in participants:
-        seq = db.execute(
-            text("SELECT events.fn_next_reservation_sequence_number(:eid)"),
-            {"eid": event_id},
-        ).scalar_one()
+        seq = _next_reservation_sequence_number(db, event_id)
         if seq_start is None:
             seq_start = seq
         seq_end = seq

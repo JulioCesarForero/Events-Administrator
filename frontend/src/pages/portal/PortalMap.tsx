@@ -7,6 +7,7 @@ import { apiClient } from '../../api/client';
 import { ArrowLeft, CheckCircle2, Minus, Plus, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { EventMap } from '../../components/ui/EventMap';
+import { LegalMarkdownBlock } from '../../components/ui/LegalMarkdownBlock';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { MapTable } from '../../api/types';
 
@@ -61,7 +62,7 @@ export const PortalMap = () => {
   const isMobile = useIsMobile();
 
   const [group, setGroup] = useState<MyGroup | null>(null);
-  const [mapData, setMapData] = useState<{ tables: MapTable[]; layoutId?: string } | null>(null);
+  const [mapData, setMapData] = useState<{ tables: MapTable[]; layoutId?: string; backgroundImageUrl?: string | null } | null>(null);
   const [policyDoc, setPolicyDoc] = useState<LegalDoc | undefined>();
   const [termsDoc, setTermsDoc] = useState<LegalDoc | undefined>();
   const [loadError, setLoadError] = useState<string>('');
@@ -84,7 +85,7 @@ export const PortalMap = () => {
       try {
         const [groupRes, mapRes, legalRes] = await Promise.all([
           apiClient.get<MyGroup>(`/portal/events/${session.eventId}/my-group`, token),
-          apiClient.get<{ tables: MapTable[]; layoutId?: string }>(
+          apiClient.get<{ tables: MapTable[]; layoutId?: string; backgroundImageUrl?: string | null }>(
             `/events/${session.eventId}/map`,
             token,
           ),
@@ -232,6 +233,7 @@ export const PortalMap = () => {
                 tables={tables}
                 isAdmin={false}
                 selectedSpots={selectedSpots}
+                backgroundImageUrl={mapData?.backgroundImageUrl || ''}
                 onTableClick={(t) => {
                   const tid = t.id || t.layoutTableId || '';
                   const avail = Math.max(0, (t.capacity || 0) - (t.occupiedSpots ?? t.occupied ?? 0));
@@ -356,20 +358,7 @@ export const PortalMap = () => {
           <section style={{ marginBottom: '20px' }}>
             <h4 style={{ margin: '0 0 4px' }}>{policyDoc.title}</h4>
             <small style={{ color: 'var(--text-secondary)' }}>Versión {policyDoc.versionLabel}</small>
-            <pre
-              style={{
-                marginTop: '12px',
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'inherit',
-                background: 'rgba(255,255,255,0.03)',
-                padding: '12px',
-                borderRadius: 'var(--radius-md)',
-                maxHeight: '180px',
-                overflowY: 'auto',
-              }}
-            >
-              {policyDoc.contentMarkdown || '(sin contenido)'}
-            </pre>
+            <LegalMarkdownBlock content={policyDoc.contentMarkdown} />
           </section>
         ) : null}
 
@@ -377,20 +366,7 @@ export const PortalMap = () => {
           <section style={{ marginBottom: '20px' }}>
             <h4 style={{ margin: '0 0 4px' }}>{termsDoc.title}</h4>
             <small style={{ color: 'var(--text-secondary)' }}>Versión {termsDoc.versionLabel}</small>
-            <pre
-              style={{
-                marginTop: '12px',
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'inherit',
-                background: 'rgba(255,255,255,0.03)',
-                padding: '12px',
-                borderRadius: 'var(--radius-md)',
-                maxHeight: '180px',
-                overflowY: 'auto',
-              }}
-            >
-              {termsDoc.contentMarkdown || '(sin contenido)'}
-            </pre>
+            <LegalMarkdownBlock content={termsDoc.contentMarkdown} />
           </section>
         ) : null}
 

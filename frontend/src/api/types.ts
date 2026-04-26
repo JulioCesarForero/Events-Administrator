@@ -251,6 +251,7 @@ export interface MapTable {
 export interface MapEnvelope {
   eventId: string;
   layoutId: string;
+  backgroundImageUrl?: string | null;
   tables: MapTable[];
 }
 

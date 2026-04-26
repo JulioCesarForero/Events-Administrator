@@ -155,7 +155,10 @@ export const StaffStudents = () => {
     setLoading(true);
     try {
       // 1. Upload to GCS
-      const uploaded = await uploadFile(fileToUpload, 'import');
+      const uploaded = await uploadFile(fileToUpload, 'import', {
+        token: session?.accessToken,
+        isBearer: true,
+      });
       
       // 2. Call backend import API with the file URL
       await apiClient.post(`/events/${eventId}/student-imports`, {

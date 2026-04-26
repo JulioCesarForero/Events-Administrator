@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Circle, Rect, Text, Group, Transformer, Image } from 'react-konva';
 import useImage from 'use-image';
 import type { MapTable } from '../../api/types';
-import { ZoomIn, ZoomOut, Maximize, LayoutGrid, AlignLeft, AlignVerticalJustifyStart as AlignTop } from 'lucide-react';
+import { LayoutGrid, AlignLeft, AlignVerticalJustifyStart as AlignTop } from 'lucide-react';
 
 interface EventMapProps {
   tables: MapTable[];
@@ -57,10 +57,25 @@ export const EventMap: React.FC<EventMapProps> = ({
   const trRef = useRef<any>(null);
   
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionBox, setSelectionBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const safeStageWidth = Math.max(1, Math.round(stageSize.width));
+  const hasValidBackgroundImage = Boolean(bgImage && bgImage.width > 0 && bgImage.height > 0);
+  const targetHeightFromImage = hasValidBackgroundImage && bgImage
+    ? Math.round(safeStageWidth * (bgImage.height / bgImage.width))
+    : 700;
+  const mapCanvasHeight = Math.max(520, Math.min(900, targetHeightFromImage));
+  const layoutWidth = width;
+  const layoutHeight = hasValidBackgroundImage && bgImage
+    ? bgImage.height * (layoutWidth / bgImage.width)
+    : 700;
+  const fitScale = Math.min(safeStageWidth / layoutWidth, mapCanvasHeight / layoutHeight);
+  const contentWidth = layoutWidth * fitScale;
+  const contentHeight = layoutHeight * fitScale;
+  const contentOffsetX = (safeStageWidth - contentWidth) / 2;
+  const contentOffsetY = (mapCanvasHeight - contentHeight) / 2;
+  const toLayoutX = (screenX: number) => Math.max(0, Math.min(layoutWidth, (screenX - contentOffsetX) / fitScale));
+  const toLayoutY = (screenY: number) => Math.max(0, Math.min(layoutHeight, (screenY - contentOffsetY) / fitScale));
 
   // Resize observer to handle container changes
   useEffect(() => {
@@ -96,25 +111,6 @@ export const EventMap: React.FC<EventMapProps> = ({
     }
   }, [selectedIds, isAdmin, tables]);
 
-  const handleWheel = (e: any) => {
-    e.evt.preventDefault();
-    const scaleBy = 1.1;
-    const stage = e.target.getStage();
-    const oldScale = stage.scaleX();
-
-    const mousePointTo = {
-      x: (stage.getPointerPosition().x - stage.x()) / oldScale,
-      y: (stage.getPointerPosition().y - stage.y()) / oldScale,
-    };
-
-    const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
-    setScale(newScale);
-    setPosition({
-      x: stage.getPointerPosition().x - mousePointTo.x * newScale,
-      y: stage.getPointerPosition().y - mousePointTo.y * newScale,
-    });
-  };
-
   const handleMouseDown = (e: any) => {
     // If clicked on stage background
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.getType() === 'Image';
@@ -123,8 +119,8 @@ export const EventMap: React.FC<EventMapProps> = ({
       const stage = e.target.getStage();
       const pos = stage.getPointerPosition();
       const scaledPos = {
-        x: (pos.x - stage.x()) / stage.scaleX(),
-        y: (pos.y - stage.y()) / stage.scaleY(),
+        x: toLayoutX(pos.x),
+        y: toLayoutY(pos.y),
       };
       setSelectedIds([]);
       setSelectionBox({ x1: scaledPos.x, y1: scaledPos.y, x2: scaledPos.x, y2: scaledPos.y });
@@ -136,8 +132,8 @@ export const EventMap: React.FC<EventMapProps> = ({
     const stage = e.target.getStage();
     const pos = stage.getPointerPosition();
     const scaledPos = {
-      x: (pos.x - stage.x()) / stage.scaleX(),
-      y: (pos.y - stage.y()) / stage.scaleY(),
+      x: toLayoutX(pos.x),
+      y: toLayoutY(pos.y),
     };
     setSelectionBox({ ...selectionBox, x2: scaledPos.x, y2: scaledPos.y });
   };
@@ -197,67 +193,64 @@ export const EventMap: React.FC<EventMapProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full min-h-[500px]">
-      {/* Visual Controls Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-2 bg-[var(--bg-glass)] border border-[var(--border-light)] rounded-[var(--radius-md)] mb-2">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setScale(s => s * 1.2)} className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.05)] flex items-center justify-center hover:bg-[rgba(255,255,255,0.1)] transition-all text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Zoom In"><ZoomIn size={16} /></button>
-          <button onClick={() => setScale(s => s / 1.2)} className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.05)] flex items-center justify-center hover:bg-[rgba(255,255,255,0.1)] transition-all text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Zoom Out"><ZoomOut size={16} /></button>
-          <button onClick={() => { setScale(1); setPosition({ x: 0, y: 0 }); }} className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.05)] flex items-center justify-center hover:bg-[rgba(255,255,255,0.1)] transition-all text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Reset View"><Maximize size={16} /></button>
+    <div className="flex flex-col gap-3 w-full min-h-[560px]">
+      {isAdmin && selectedIds.length > 1 && (
+        <div className="flex items-center gap-2 animate-slide-up p-2 bg-[var(--bg-glass)] border border-[var(--border-light)] rounded-[var(--radius-md)]">
+          <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mr-2">{selectedIds.length} SELECCIONADOS:</span>
+          <button onClick={() => alignSelection('left')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-all text-xs font-bold border border-blue-500/20"><AlignLeft size={14} /> Alinear Izquierda</button>
+          <button onClick={() => alignSelection('top')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-all text-xs font-bold border border-blue-500/20"><AlignTop size={14} /> Alinear Arriba</button>
+          <button onClick={() => distributeSelection('h')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-all text-xs font-bold border border-indigo-500/20"><LayoutGrid size={14} /> Distribuir H</button>
+          <button onClick={() => distributeSelection('v')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-all text-xs font-bold border border-indigo-500/20"><LayoutGrid size={14} className="rotate-90" /> Distribuir V</button>
+          <button onClick={() => setSelectedIds([])} className="text-slate-500 hover:text-white px-2">X</button>
         </div>
-
-        {isAdmin && selectedIds.length > 1 && (
-          <div className="flex items-center gap-2 animate-slide-up">
-            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mr-2">{selectedIds.length} SELECCIONADOS:</span>
-            <button onClick={() => alignSelection('left')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-all text-xs font-bold border border-blue-500/20"><AlignLeft size={14} /> Alineación lzquierda</button>
-            <button onClick={() => alignSelection('top')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-all text-xs font-bold border border-blue-500/20"><AlignTop size={14} /> Alineación Superior</button>
-            <button onClick={() => distributeSelection('h')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-all text-xs font-bold border border-indigo-500/20"><LayoutGrid size={14} /> Distribuir H</button>
-            <button onClick={() => distributeSelection('v')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-all text-xs font-bold border border-indigo-500/20"><LayoutGrid size={14} className="rotate-90" /> Distribuir V</button>
-            <button onClick={() => setSelectedIds([])} className="text-slate-500 hover:text-white px-2">X</button>
-          </div>
-        )}
-      </div>
+      )}
 
       <div 
         ref={containerRef} 
-        className="flex-grow bg-[rgba(0,0,0,0.2)] rounded-2xl overflow-hidden border border-[var(--border-light)] relative cursor-crosshair"
+        className="bg-[rgba(0,0,0,0.2)] rounded-2xl overflow-hidden border border-[var(--border-light)] relative cursor-crosshair min-h-[560px]"
+        style={{ height: `${mapCanvasHeight}px` }}
       >
         <Stage 
           ref={stageRef}
-          width={stageSize.width} 
-          height={stageSize.height} 
-          scaleX={scale}
-          scaleY={scale}
-          x={position.x}
-          y={position.y}
-          onWheel={handleWheel}
+          width={safeStageWidth} 
+          height={mapCanvasHeight} 
+          scaleX={1}
+          scaleY={1}
+          x={0}
+          y={0}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          draggable={!selectionBox && (!isAdmin || selectedIds.length === 0)}
-          onDragEnd={e => {
-            if (e.target === stageRef.current) {
-              setPosition({ x: e.target.x(), y: e.target.y() });
-            }
-          }}
+          draggable={false}
         >
           <Layer>
-            {/* Background Image */}
-            {bgImage && (
-              <Image 
-                image={bgImage} 
-                x={0} 
-                y={0} 
-                width={width}
-                height={bgImage.height * (width / bgImage.width)}
-                listening={false}
-              />
-            )}
-            {/* Stage defaults/grid can be added here if needed */}
-            <Rect x={width / 2 - 150} y={20} width={300} height={40} fill="rgba(255,255,255,0.05)" cornerRadius={4} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
-            <Text text="ESCENARIO PRINCIPAL" x={width / 2 - 150} y={32} width={300} align="center" fontSize={10} fill="rgba(255,255,255,0.3)" fontStyle="bold" letterSpacing={3} />
-            
-            {tables.map(table => {
+            <Group x={contentOffsetX} y={contentOffsetY} scaleX={fitScale} scaleY={fitScale}>
+              {/* Background Image */}
+              {hasValidBackgroundImage && bgImage && (
+                <Image 
+                  image={bgImage} 
+                  x={0} 
+                  y={0} 
+                  width={layoutWidth}
+                  height={layoutHeight}
+                  listening={false}
+                />
+              )}
+              {!hasValidBackgroundImage && (
+                <Rect
+                  x={0}
+                  y={0}
+                  width={layoutWidth}
+                  height={layoutHeight}
+                  fill="rgba(255,255,255,0.03)"
+                  stroke="rgba(255,255,255,0.12)"
+                />
+              )}
+              {/* Stage defaults/grid can be added here if needed */}
+              <Rect x={layoutWidth / 2 - 150} y={20} width={300} height={40} fill="rgba(255,255,255,0.05)" cornerRadius={4} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+              <Text text="ESCENARIO PRINCIPAL" x={layoutWidth / 2 - 150} y={32} width={300} align="center" fontSize={10} fill="rgba(255,255,255,0.3)" fontStyle="bold" letterSpacing={3} />
+              
+              {tables.map(table => {
               const tid = tableId(table);
               const available = getAvailable(table);
               const occupied = getOccupied(table);
@@ -372,22 +365,23 @@ export const EventMap: React.FC<EventMapProps> = ({
                   )}
                 </Group>
               );
-            })}
+              })}
 
-            {isAdmin && <Transformer ref={trRef} keepRatio={true} enabledAnchors={[]} rotateEnabled={false} borderStroke="#3b82f6" borderStrokeWidth={2} anchorFill="#3b82f6" />}
-            
-            {selectionBox && (
-              <Rect
-                x={Math.min(selectionBox.x1, selectionBox.x2)}
-                y={Math.min(selectionBox.y1, selectionBox.y2)}
-                width={Math.abs(selectionBox.x2 - selectionBox.x1)}
-                height={Math.abs(selectionBox.y2 - selectionBox.y1)}
-                fill="rgba(59, 130, 246, 0.1)"
-                stroke="#3b82f6"
-                strokeWidth={1}
-                dash={[4, 2]}
-              />
-            )}
+              {isAdmin && <Transformer ref={trRef} keepRatio={true} enabledAnchors={[]} rotateEnabled={false} borderStroke="#3b82f6" borderStrokeWidth={2} anchorFill="#3b82f6" />}
+              
+              {selectionBox && (
+                <Rect
+                  x={Math.min(selectionBox.x1, selectionBox.x2)}
+                  y={Math.min(selectionBox.y1, selectionBox.y2)}
+                  width={Math.abs(selectionBox.x2 - selectionBox.x1)}
+                  height={Math.abs(selectionBox.y2 - selectionBox.y1)}
+                  fill="rgba(59, 130, 246, 0.1)"
+                  stroke="#3b82f6"
+                  strokeWidth={1}
+                  dash={[4, 2]}
+                />
+              )}
+            </Group>
           </Layer>
         </Stage>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStaff } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
@@ -6,12 +6,14 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { apiClient } from '../../api/client';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, X, Eye, AlertTriangle, ExternalLink, FileText } from 'lucide-react';
+import { ArrowLeft, Check, X, Eye, AlertTriangle, ExternalLink, FileText, Filter } from 'lucide-react';
 
 interface PaymentRow {
   id: string;
   status: string;
   attendeeGroupId: string;
+  studentCodeSnapshot?: string | null;
+  displayName?: string | null;
   ticketQuantity: number;
   paymentType: 'DIGITAL' | 'CASH' | string;
   amountCents?: number | null;
@@ -48,6 +50,9 @@ export const StaffPayments = () => {
   const navigate = useNavigate();
 
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING_APPROVAL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'DIGITAL' | 'CASH'>('ALL');
+  const [searchFilter, setSearchFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string>('');
 
@@ -68,8 +73,11 @@ export const StaffPayments = () => {
     setLoading(true);
     setLoadError('');
     try {
+      const params = new URLSearchParams();
+      params.set('status', statusFilter);
+      if (searchFilter.trim()) params.set('q', searchFilter.trim());
       const res = await apiClient.get<PaymentRow[]>(
-        `/events/${eventId}/payment-inbox`,
+        `/events/${eventId}/payment-inbox?${params.toString()}`,
         { token: session.accessToken, isBearer: true },
       );
       setPayments(res || []);
@@ -80,11 +88,16 @@ export const StaffPayments = () => {
     } finally {
       setLoading(false);
     }
-  }, [session, eventId]);
+  }, [session, eventId, statusFilter, searchFilter]);
 
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
+
+  const visiblePayments = useMemo(() => {
+    if (typeFilter === 'ALL') return payments;
+    return payments.filter((p) => p.paymentType === typeFilter);
+  }, [payments, typeFilter]);
 
   useEffect(() => {
     if (!session || !active) {
@@ -151,7 +164,7 @@ export const StaffPayments = () => {
         { approvedTicketCount },
         { token: session.accessToken, isBearer: true },
       );
-      setPayments((prev) => prev.filter((p) => p.id !== active.id));
+      await loadPayments();
       setApproveOpen(false);
       setActive(null);
     } catch (err: unknown) {
@@ -176,7 +189,7 @@ export const StaffPayments = () => {
         { reason: rejectReason.trim() },
         { token: session.accessToken, isBearer: true },
       );
-      setPayments((prev) => prev.filter((p) => p.id !== active.id));
+      await loadPayments();
       setRejectOpen(false);
       setActive(null);
     } catch (err: unknown) {
@@ -198,8 +211,53 @@ export const StaffPayments = () => {
         >
           <ArrowLeft size={24} />
         </button>
-        <h2 style={{ margin: 0 }}>Bandeja de Pagos ({payments.length})</h2>
+        <h2 style={{ margin: 0 }}>Bandeja de Pagos ({visiblePayments.length})</h2>
       </div>
+
+      <GlassCard style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', alignItems: 'end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Buscar estudiante o grupo
+            </label>
+            <input
+              className="glass-input"
+              placeholder="Código estudiante, nombre, grupo o tipo de pago"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Estado</label>
+            <select
+              className="glass-input"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ALL')}
+            >
+              <option value="PENDING_APPROVAL">Pendiente</option>
+              <option value="APPROVED">Aprobado</option>
+              <option value="REJECTED">Rechazado</option>
+              <option value="ALL">Todos</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Tipo de pago</label>
+            <select
+              className="glass-input"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as 'ALL' | 'DIGITAL' | 'CASH')}
+            >
+              <option value="ALL">Todos</option>
+              <option value="DIGITAL">Digital</option>
+              <option value="CASH">Efectivo</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ marginTop: '10px', color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Filter size={14} />
+          Mostrando {visiblePayments.length} resultado(s)
+        </div>
+      </GlassCard>
 
       {loadError && (
         <GlassCard style={{ marginBottom: '16px', borderLeft: '3px solid var(--error)' }}>
@@ -219,18 +277,22 @@ export const StaffPayments = () => {
             <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Cargando pagos…</p>
           </GlassCard>
         )}
-        {!loading && payments.length === 0 && !loadError && (
+        {!loading && visiblePayments.length === 0 && !loadError && (
           <GlassCard style={{ textAlign: 'center', padding: '40px' }}>
             <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-              No hay pagos pendientes de revisión.
+              No se encontraron pagos para los filtros seleccionados.
             </p>
           </GlassCard>
         )}
-        {payments.map((p) => (
+        {visiblePayments.map((p) => (
           <GlassCard key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <h4 style={{ margin: '0 0 8px 0' }}>Grupo {p.attendeeGroupId.slice(0, 8)}…</h4>
+              <h4 style={{ margin: '0 0 8px 0' }}>
+                {p.displayName || p.studentCodeSnapshot || `Grupo ${p.attendeeGroupId.slice(0, 8)}…`}
+              </h4>
               <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.875rem', flexWrap: 'wrap' }}>
+                {p.studentCodeSnapshot && <span>Código: <strong>{p.studentCodeSnapshot}</strong></span>}
+                <span>Estado: <strong>{p.status}</strong></span>
                 <span>Tipo: <strong>{p.paymentType}</strong></span>
                 <span>Boletas: <strong>{p.ticketQuantity}</strong></span>
                 {typeof p.amountCents === 'number' && (
@@ -250,21 +312,25 @@ export const StaffPayments = () => {
               <Button variant="secondary" icon={Eye} onClick={() => setActive(p)}>
                 Detalle
               </Button>
-              <Button
-                variant="outline"
-                style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
-                icon={X}
-                onClick={() => openReject(p)}
-              >
-                Rechazar
-              </Button>
-              <Button
-                style={{ background: 'var(--success)', color: '#000', boxShadow: 'none' }}
-                icon={Check}
-                onClick={() => openApprove(p)}
-              >
-                Aprobar
-              </Button>
+              {p.status === 'PENDING_APPROVAL' && (
+                <>
+                  <Button
+                    variant="outline"
+                    style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
+                    icon={X}
+                    onClick={() => openReject(p)}
+                  >
+                    Rechazar
+                  </Button>
+                  <Button
+                    style={{ background: 'var(--success)', color: '#000', boxShadow: 'none' }}
+                    icon={Check}
+                    onClick={() => openApprove(p)}
+                  >
+                    Aprobar
+                  </Button>
+                </>
+              )}
             </div>
           </GlassCard>
         ))}

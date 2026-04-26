@@ -40,6 +40,30 @@ def _get_group_for_buyer(db: Session, claims: dict, event_id: UUID) -> AttendeeG
     return g
 
 
+def _effective_group_payment(db: Session, group: AttendeeGroup) -> Payment | None:
+    """
+    Resolve the payment that should drive buyer-facing state.
+    Prefer the current payment when approved; otherwise fallback to latest approved.
+    """
+    pay: Payment | None = (
+        db.get(Payment, group.current_payment_id) if group.current_payment_id else None
+    )
+    if pay is not None and pay.status == "APPROVED":
+        return pay
+    return (
+        db.execute(
+            select(Payment)
+            .where(
+                Payment.attendee_group_id == group.id,
+                Payment.event_id == group.event_id,
+                Payment.status == "APPROVED",
+            )
+            .order_by(Payment.approved_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+    )
+
+
 class MyGroupPaymentOut(CamelOrmModel):
     id: UUID
     status: str
@@ -77,9 +101,7 @@ def get_my_group(
     cfg = db.execute(
         select(EventConfiguration).where(EventConfiguration.event_id == event_id)
     ).scalar_one_or_none()
-    pay: Payment | None = (
-        db.get(Payment, g.current_payment_id) if g.current_payment_id else None
-    )
+    pay = _effective_group_payment(db, g)
     payment_out = None
     if pay is not None:
         payment_out = MyGroupPaymentOut(
@@ -98,8 +120,8 @@ def get_my_group(
         student_code_snapshot=g.student_code_snapshot,
         display_name=g.display_name,
         reservation_status=g.reservation_status,
-        approved_ticket_count=g.approved_ticket_count,
-        current_payment_id=g.current_payment_id,
+        approved_ticket_count=pay.ticket_quantity if pay is not None else g.approved_ticket_count,
+        current_payment_id=pay.id if pay is not None else g.current_payment_id,
         current_payment=payment_out,
         event_date=ev.event_date if ev else None,
         timezone=cfg.timezone if cfg else None,

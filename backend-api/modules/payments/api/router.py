@@ -263,9 +263,19 @@ def approve_payment(
     ensure_event_staff_access(db, staff, p.event_id)
     if p.status != "PENDING_APPROVAL":
         raise ConflictError("Payment is not pending approval", code=PAYMENT_ALREADY_REVIEWED)
+    original_qty = p.ticket_quantity
     approved_count = (body.approved_ticket_count if body and body.approved_ticket_count else p.ticket_quantity)
     p.status = "APPROVED"
     p.ticket_quantity = approved_count
+    # Keep displayed amount consistent when staff adjusts approved tickets.
+    if (
+        p.amount_cents is not None
+        and original_qty > 0
+        and approved_count > 0
+        and approved_count != original_qty
+    ):
+        unit_amount = p.amount_cents / original_qty
+        p.amount_cents = int(round(unit_amount * approved_count))
     p.approved_at = datetime.now(UTC)
     p.reviewed_by_user_id = staff.id
     g = db.get(AttendeeGroup, p.attendee_group_id)
@@ -545,6 +555,40 @@ def list_payment_evidences(
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     ensure_event_staff_access(db, staff, p.event_id)
+    evidences = list(
+        db.execute(
+            select(PaymentEvidence)
+            .where(PaymentEvidence.payment_id == payment_id)
+            .order_by(PaymentEvidence.created_at.desc())
+        ).scalars()
+    )
+    for evidence in evidences:
+        setattr(evidence, "view_url", _signed_view_url(evidence) or evidence.file_url)
+    return evidences
+
+
+@router.get("/portal/payments/{payment_id}/evidences", response_model=list[EvidenceOut])
+def list_payment_evidences_buyer(
+    payment_id: UUID,
+    db: DbSession,
+    claims: BuyerClaimsDep,
+) -> list[PaymentEvidence]:
+    from infrastructure.storage.signed_urls import generate_download_url
+
+    def _signed_view_url(row: PaymentEvidence) -> str | None:
+        if not row.storage_path or not row.storage_path.startswith("gs://"):
+            return None
+        _, path_part = row.storage_path.split("gs://", 1)
+        bucket, key = path_part.split("/", 1)
+        try:
+            return generate_download_url(bucket=bucket, object_key=key)
+        except Exception:
+            return None
+
+    p = db.get(Payment, payment_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    _buyer_group(db, claims, p.attendee_group_id)
     evidences = list(
         db.execute(
             select(PaymentEvidence)

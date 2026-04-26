@@ -4,7 +4,11 @@ import { apiClient } from '../api/client';
 export type UploadPurpose = 'import' | 'layout' | 'evidence' | 'general';
 
 interface UseGCSUploadReturn {
-  uploadFile: (file: File, purpose: UploadPurpose) => Promise<UploadResult>;
+  uploadFile: (
+    file: File,
+    purpose: UploadPurpose,
+    auth?: { token?: string; isBearer?: boolean },
+  ) => Promise<UploadResult>;
   isUploading: boolean;
   error: string | null;
   progress: number;
@@ -22,12 +26,19 @@ export function useGCSUpload(): UseGCSUploadReturn {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
 
-  const uploadFile = async (file: File, purpose: UploadPurpose): Promise<UploadResult> => {
+  const uploadFile = async (
+    file: File,
+    purpose: UploadPurpose,
+    auth: { token?: string; isBearer?: boolean } = {},
+  ): Promise<UploadResult> => {
     setIsUploading(true);
     setError(null);
     setProgress(0);
 
     try {
+      if (!auth.token) {
+        throw new Error('Missing auth token for storage upload');
+      }
       // 1. Request Signed URL from Backend
       const response = await apiClient.post<{
         uploadUrl: string;
@@ -40,6 +51,9 @@ export function useGCSUpload(): UseGCSUploadReturn {
         contentType: file.type || 'application/octet-stream',
         purpose: purpose,
         sizeBytes: file.size,
+      }, {
+        token: auth.token,
+        isBearer: auth.isBearer ?? true,
       });
 
       const { uploadUrl, fileUrl, bucket, objectKey, storagePath } = response;

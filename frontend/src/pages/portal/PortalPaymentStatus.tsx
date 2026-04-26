@@ -27,6 +27,23 @@ interface MyGroup {
   currentPayment?: MyGroupPayment | null;
 }
 
+interface EvidenceRow {
+  id: string;
+  fileUrl: string;
+  viewUrl?: string | null;
+  mimeType?: string | null;
+  fileName?: string | null;
+  sizeBytes?: number | null;
+  createdAt?: string | null;
+}
+
+function formatSize(bytes?: number | null): string {
+  if (bytes === null || bytes === undefined) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 export const PortalPaymentStatus = () => {
   const { session } = useAuthPortal();
   const navigate = useNavigate();
@@ -34,6 +51,7 @@ export const PortalPaymentStatus = () => {
   const [loading, setLoading] = useState(true);
   const [resubmitLoading, setResubmitLoading] = useState(false);
   const [error, setError] = useState('');
+  const [evidences, setEvidences] = useState<EvidenceRow[]>([]);
 
   useEffect(() => {
     if (!session) return;
@@ -46,6 +64,17 @@ export const PortalPaymentStatus = () => {
           { token: session.sessionToken, isBearer: true, signal: controller.signal },
         );
         setGroup(res);
+        if (res.currentPayment?.id) {
+          const rows = await apiClient
+            .get<EvidenceRow[]>(
+              `/portal/payments/${res.currentPayment.id}/evidences`,
+              { token: session.sessionToken, isBearer: true, signal: controller.signal },
+            )
+            .catch(() => [] as EvidenceRow[]);
+          setEvidences(rows || []);
+        } else {
+          setEvidences([]);
+        }
       } catch (err: unknown) {
         const msg =
           err instanceof Error ? err.message : 'No se pudo cargar el estado del pago';
@@ -201,6 +230,37 @@ export const PortalPaymentStatus = () => {
             Tipo: {payment.paymentType} · Boletas: {payment.ticketQuantity} · ID:{' '}
             {payment.id.slice(0, 8)}…
           </p>
+          <div style={{ marginTop: '16px' }}>
+            <strong style={{ display: 'block', marginBottom: '8px' }}>Comprobantes ({evidences.length})</strong>
+            {evidences.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                Aun no hay comprobantes adjuntos para este pago.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {evidences.map((ev) => {
+                  const href = ev.viewUrl || ev.fileUrl;
+                  return (
+                    <a
+                      key={ev.id}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="glass-panel"
+                      style={{ padding: '10px 12px', textDecoration: 'none', color: 'var(--text-primary)' }}
+                    >
+                      <div style={{ fontWeight: 600 }}>{ev.fileName || 'Comprobante'}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {ev.mimeType || 'archivo'}
+                        {ev.sizeBytes ? ` · ${formatSize(ev.sizeBytes)}` : ''}
+                        {ev.createdAt ? ` · ${new Date(ev.createdAt).toLocaleString()}` : ''}
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </GlassCard>
       )}
     </div>

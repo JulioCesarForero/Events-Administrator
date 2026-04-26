@@ -3,6 +3,7 @@ import { useAuthPortal } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { apiClient } from '../../api/client';
 import { UserPlus, Trash2, ArrowLeft, CalendarClock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -39,6 +40,10 @@ export const PortalAttendees = () => {
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [attendeeToDelete, setAttendeeToDelete] = useState<Attendee | null>(null);
   const [group, setGroup] = useState<MyGroup | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -109,6 +114,44 @@ export const PortalAttendees = () => {
     }
   };
 
+  const openDeleteModal = (attendee: Attendee) => {
+    setDeleteError('');
+    setDeleteSuccess('');
+    setAttendeeToDelete(attendee);
+  };
+
+  const closeDeleteModal = () => {
+    if (deleting) return;
+    setAttendeeToDelete(null);
+    setDeleteError('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!session || !attendeeToDelete?.id) return;
+    setDeleteError('');
+    setDeleting(true);
+    try {
+      await apiClient.delete(
+        `/groups/${session.groupId}/participants/${attendeeToDelete.id}`,
+        {
+          token: session.sessionToken,
+          isBearer: true,
+        },
+      );
+      setAttendees((prev) => prev.filter((att) => att.id !== attendeeToDelete.id));
+      setAttendeeToDelete(null);
+      setDeleteSuccess('Asistente eliminado correctamente.');
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'No fue posible eliminar el asistente en este momento.';
+      setDeleteError(msg);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (!session) return null;
 
   return (
@@ -146,6 +189,12 @@ export const PortalAttendees = () => {
         </GlassCard>
       )}
 
+      {deleteSuccess && (
+        <GlassCard style={{ marginBottom: '16px', padding: '12px 16px' }}>
+          <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--success)' }}>{deleteSuccess}</p>
+        </GlassCard>
+      )}
+
       {!showForm ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {attendees.map((att, idx) => (
@@ -161,7 +210,14 @@ export const PortalAttendees = () => {
                   {att.documentType} {att.documentId}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" icon={Trash2} disabled={editWindowClosed} />
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={Trash2}
+                disabled={editWindowClosed || !att.id}
+                onClick={() => openDeleteModal(att)}
+                aria-label={`Eliminar asistente ${att.firstName} ${att.lastName}`}
+              />
             </GlassCard>
           ))}
 
@@ -302,6 +358,35 @@ export const PortalAttendees = () => {
           </form>
         </GlassCard>
       )}
+
+      <Modal
+        isOpen={Boolean(attendeeToDelete)}
+        onClose={closeDeleteModal}
+        title="Eliminar asistente"
+      >
+        <p style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text-secondary)' }}>
+          Esta acción eliminará el registro de{' '}
+          <strong style={{ color: 'var(--text-primary)' }}>
+            {attendeeToDelete?.firstName} {attendeeToDelete?.lastName}
+          </strong>
+          . ¿Deseas continuar?
+        </p>
+
+        {deleteError && (
+          <p style={{ marginTop: 0, marginBottom: '12px', color: 'var(--error)', fontSize: '0.9rem' }}>
+            {deleteError}
+          </p>
+        )}
+
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <Button type="button" variant="secondary" onClick={closeDeleteModal} disabled={deleting}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleConfirmDelete} isLoading={deleting}>
+            Aceptar
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

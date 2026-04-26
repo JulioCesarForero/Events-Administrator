@@ -21,6 +21,19 @@ export const StaffMap = () => {
   const [previewMode, setPreviewMode] = useState(false);
   const { uploadFile, isUploading } = useGCSUpload();
 
+  const nextObjectCode = (baseCode: string): string => {
+    const base = baseCode.toUpperCase();
+    const used = new Set(tables.map((t) => (t.code || '').toUpperCase()));
+    if (!used.has(base)) return base;
+    let i = 2;
+    while (used.has(`${base}-${i}`)) i += 1;
+    return `${base}-${i}`;
+  };
+  const isDecorationCode = (code: string): boolean => {
+    const normalized = (code || '').toUpperCase();
+    return ['TARIMA', 'PISTA', 'ENTRADA', 'SALIDA'].some(prefix => normalized === prefix || normalized.startsWith(`${prefix}-`));
+  };
+
   useEffect(() => {
     if (session) {
       loadMap();
@@ -30,15 +43,13 @@ export const StaffMap = () => {
   const loadMap = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<{ layoutId: string, tables: MapTable[] }>(
+      const res = await apiClient.get<{ layoutId: string; tables: MapTable[]; backgroundImageUrl?: string | null }>(
         `/events/${eventId}/map`, 
         { token: session?.accessToken, isBearer: true }
       );
       setLayoutId(res.layoutId);
       setTables(res.tables || []);
-      // res.backgroundImageUrl might be present if we updated the API response
-      // But let's assume it's part of the map envelope for now
-      setBackgroundImageUrl((res as any).backgroundImageUrl || '');
+      setBackgroundImageUrl(res.backgroundImageUrl || '');
     } catch (err) {
       console.error("No se pudo cargar el mapa", err);
     } finally {
@@ -57,16 +68,16 @@ export const StaffMap = () => {
     };
 
     if (category === 'table') {
-      const count = tables.filter(t => !['TARIMA', 'PISTA', 'ENTRADA', 'SALIDA'].includes((t.code || '').toUpperCase())).length;
+      const count = tables.filter(t => !isDecorationCode(t.code || '')).length;
       config.code = (count + 1).toString();
     } else if (category === 'stage') {
-      config = { ...config, tableCapacityLimit: 0, code: 'TARIMA', isPublicSelectable: false };
+      config = { ...config, tableCapacityLimit: 1, code: nextObjectCode('TARIMA'), isPublicSelectable: false };
     } else if (category === 'dancefloor') {
-      config = { ...config, tableCapacityLimit: 0, code: 'PISTA', isPublicSelectable: false };
+      config = { ...config, tableCapacityLimit: 1, code: nextObjectCode('PISTA'), isPublicSelectable: false };
     } else if (category === 'entrance') {
-      config = { ...config, tableCapacityLimit: 0, code: 'ENTRADA', isPublicSelectable: false };
+      config = { ...config, tableCapacityLimit: 1, code: nextObjectCode('ENTRADA'), isPublicSelectable: false };
     } else if (category === 'exit') {
-      config = { ...config, tableCapacityLimit: 0, code: 'SALIDA', isPublicSelectable: false };
+      config = { ...config, tableCapacityLimit: 1, code: nextObjectCode('SALIDA'), isPublicSelectable: false };
     }
 
     try {
@@ -202,12 +213,15 @@ export const StaffMap = () => {
       
       try {
         setLoading(true);
-        const uploaded = await uploadFile(file, 'layout');
-        await apiClient.patch(`/layouts/${layoutId}/background`, 
-          { backgroundImageUrl: uploaded.fileUrl },
+        const uploaded = await uploadFile(file, 'layout', {
+          token: session.accessToken,
+          isBearer: true,
+        });
+        const res = await apiClient.patch<{ status: string; backgroundImageUrl?: string }>(`/layouts/${layoutId}/background`, 
+          { backgroundImageUrl: uploaded.storagePath || uploaded.fileUrl },
           { token: session.accessToken, isBearer: true }
         );
-        setBackgroundImageUrl(uploaded.fileUrl);
+        setBackgroundImageUrl(res.backgroundImageUrl || uploaded.fileUrl);
         alert("Fondo actualizado correctamente");
       } catch (err) {
         console.error("Error subiendo fondo", err);
@@ -333,7 +347,7 @@ export const StaffMap = () => {
              <h3 style={{ marginTop: 0, marginBottom: '20px' }}>Resumen del Plano</h3>
              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}><Users size={16}/> Capacidad Total</span>
-                <span style={{ fontWeight: 'bold' }}>{tables.filter(t => !['TARIMA', 'PISTA', 'ENTRADA', 'SALIDA'].includes((t.code || '').toUpperCase())).reduce((s, t) => s + (t.capacity || 0), 0)}</span>
+                <span style={{ fontWeight: 'bold' }}>{tables.filter(t => !isDecorationCode(t.code || '')).reduce((s, t) => s + (t.capacity || 0), 0)}</span>
              </div>
              
              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px' }}>
