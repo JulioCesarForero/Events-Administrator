@@ -48,6 +48,7 @@ class MapTableOut(CamelModel):
 class MapEnvelope(CamelModel):
     event_id: UUID
     layout_id: UUID
+    background_image_url: str | None = None
     tables: list[MapTableOut]
 
 
@@ -158,9 +159,12 @@ def get_event_map(event_id: UUID, request: Request, db: DbSession) -> MapEnvelop
                 )
         layout_id = _latest_binding(db, event_id).layout_id
 
+    layout = db.get(Layout, layout_id)
+
     return MapEnvelope(
         event_id=event_id,
         layout_id=layout_id,
+        background_image_url=layout.background_image_url if layout else None,
         tables=_map_tables(db, layout_id),
     )
 

@@ -251,3 +251,23 @@ def update_participant(
         setattr(p, k, v)
     db.flush()
     return p
+
+
+@router.delete("/groups/{group_id}/participants/{participant_id}", status_code=204)
+def delete_participant(
+    group_id: UUID,
+    participant_id: UUID,
+    db: DbSession,
+    claims: BuyerClaimsDep,
+) -> None:
+    g = _can_access_group(db, None, claims, group_id)
+    ev = _load_event_for_group(db, g)
+    tz = _event_timezone(db, ev.id)
+    ensure_participant_editable_window(ev.event_date, timezone=tz)
+
+    p = db.get(Participant, participant_id)
+    if p is None or p.attendee_group_id != group_id:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    db.delete(p)
+    db.flush()

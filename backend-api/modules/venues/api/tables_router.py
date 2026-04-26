@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import Field
 
 from shared.api.schemas import CamelModel, CamelOrmModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -86,7 +87,15 @@ def create_table(
         is_public_selectable=body.is_public_selectable,
     )
     db.add(t)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        msg = str(exc.orig).lower() if exc.orig is not None else str(exc).lower()
+        if "uq_layout_table_layout_code" in msg:
+            raise HTTPException(status_code=409, detail="Table code already exists in this layout") from exc
+        if "ck_layout_table_capacity" in msg:
+            raise HTTPException(status_code=400, detail="tableCapacityLimit must be greater than 0") from exc
+        raise HTTPException(status_code=400, detail="Invalid table data for layout") from exc
     return t
 
 
@@ -113,7 +122,15 @@ def update_table(
     if body.is_public_selectable is not None:
         t.is_public_selectable = body.is_public_selectable
         
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        msg = str(exc.orig).lower() if exc.orig is not None else str(exc).lower()
+        if "uq_layout_table_layout_code" in msg:
+            raise HTTPException(status_code=409, detail="Table code already exists in this layout") from exc
+        if "ck_layout_table_capacity" in msg:
+            raise HTTPException(status_code=400, detail="tableCapacityLimit must be greater than 0") from exc
+        raise HTTPException(status_code=400, detail="Invalid table update for layout") from exc
     return t
 
 

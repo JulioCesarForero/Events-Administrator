@@ -2,11 +2,11 @@ from datetime import UTC, datetime
 from urllib.parse import unquote, urlparse
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import AliasChoices, Field, computed_field
 
 from shared.api.schemas import CamelModel, CamelOrmModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from domain.error_codes import (
     MISSING_PAYMENT_EVIDENCE,
@@ -71,6 +71,11 @@ class PaymentOut(CamelOrmModel):
     def reason(self) -> str | None:
         """Canonical alias per contract §4.9."""
         return self.rejection_reason
+
+
+class PaymentInboxOut(PaymentOut):
+    student_code_snapshot: str | None = None
+    display_name: str | None = None
 
 
 def _check_stage_limit(db, event_id: UUID, requested_tickets: int) -> None:
@@ -195,21 +200,50 @@ def submit_payment(
     return p
 
 
-@router.get("/events/{event_id}/payment-inbox", response_model=list[PaymentOut])
+@router.get("/events/{event_id}/payment-inbox", response_model=list[PaymentInboxOut])
 def payment_inbox(
     event_id: UUID,
     db: DbSession,
     staff: StaffUserDep,
-) -> list[Payment]:
+    status: str = Query(default="PENDING_APPROVAL"),
+    q: str | None = Query(default=None),
+) -> list[PaymentInboxOut]:
     ensure_event_staff_access(db, staff, event_id)
-    return list(
-        db.execute(
-            select(Payment).where(
-                Payment.event_id == event_id,
-                Payment.status == "PENDING_APPROVAL",
-            )
-        ).scalars()
+    stmt = (
+        select(
+            Payment,
+            AttendeeGroup.student_code_snapshot,
+            AttendeeGroup.display_name,
+        )
+        .join(AttendeeGroup, AttendeeGroup.id == Payment.attendee_group_id)
+        .where(Payment.event_id == event_id)
+        .order_by(Payment.submitted_at.desc())
     )
+    if status and status.upper() != "ALL":
+        stmt = stmt.where(Payment.status == status.upper())
+    if q:
+        term = f"%{q.strip()}%"
+        if term != "%%":
+            stmt = stmt.where(
+                or_(
+                    AttendeeGroup.student_code_snapshot.ilike(term),
+                    AttendeeGroup.display_name.ilike(term),
+                    Payment.payment_type.ilike(term),
+                )
+            )
+    rows = db.execute(stmt).all()
+    payload: list[PaymentInboxOut] = []
+    for payment, student_code_snapshot, display_name in rows:
+        payload.append(
+            PaymentInboxOut.model_validate(
+                {
+                    **PaymentOut.model_validate(payment).model_dump(),
+                    "studentCodeSnapshot": student_code_snapshot,
+                    "displayName": display_name,
+                }
+            )
+        )
+    return payload
 
 
 class ApproveBody(CamelModel):

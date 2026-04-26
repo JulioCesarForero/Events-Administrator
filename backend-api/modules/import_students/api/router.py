@@ -1,5 +1,6 @@
 from uuid import UUID
 from urllib.parse import unquote, urlparse
+import unicodedata
 
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
@@ -49,6 +50,13 @@ def create_import(
     import io
     from google.cloud import storage
     from config.settings import settings
+
+    def _normalize_header(value: str) -> str:
+        raw = (value or "").replace("\ufeff", "").strip().lower()
+        raw = unicodedata.normalize("NFKD", raw)
+        raw = "".join(ch for ch in raw if not unicodedata.combining(ch))
+        raw = raw.replace(" ", "_").replace("-", "_")
+        return raw
 
     ensure_event_staff_access(db, staff, event_id)
     
@@ -105,19 +113,36 @@ def create_import(
             content = blob.download_as_text()
             f = io.StringIO(content)
             
-            # Detect delimiter
-            dialect = csv.Sniffer().sniff(content[:2048])
-            reader = csv.DictReader(f, dialect=dialect)
+            # Detect delimiter (fallback to ';' or ',').
+            sample = content[:2048]
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=",;")
+                delimiter = dialect.delimiter
+            except Exception:
+                first_line = content.splitlines()[0] if content else ""
+                delimiter = ";" if ";" in first_line else ","
+            reader = csv.DictReader(f, delimiter=delimiter)
             
-            # Normalize headers
-            reader.fieldnames = [fn.lower().strip() for fn in (reader.fieldnames or [])]
+            # Normalize headers (BOM, accents, spaces).
+            reader.fieldnames = [_normalize_header(fn) for fn in (reader.fieldnames or [])]
+            expected = {_normalize_header(c) for c in REQUIRED_IMPORT_COLUMNS}
+            present = set(reader.fieldnames or [])
+            if not expected.issubset(present):
+                raise ValueError(
+                    "CSV headers must include codigo_unico, apellidos, nombres"
+                )
             
             for row in reader:
+                student_code = (row.get("codigo_unico") or row.get("codigo") or "").strip()
+                first_name = (row.get("nombres") or row.get("nombre") or "").strip()
+                last_name = (row.get("apellidos") or row.get("apellido") or "").strip()
+                if not student_code:
+                    continue
                 rows_to_process.append(
                     StudentRow(
-                        student_code=row.get("codigo_unico", ""),
-                        first_name=row.get("nombres", ""),
-                        last_name=row.get("apellidos", "")
+                        student_code=student_code,
+                        first_name=first_name,
+                        last_name=last_name,
                     )
                 )
         except Exception as e:
@@ -148,7 +173,15 @@ def create_import(
         batch.failed_rows = total - imported
         batch.status = "COMPLETED"
     else:
-        batch.status = "PENDING"
+        batch.status = "FAILED"
+        db.flush()
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No valid student rows found in CSV. "
+                "Expected headers: codigo_unico, apellidos, nombres"
+            ),
+        )
         
     db.flush()
     return ImportCreateResponse(batch_id=batch.id, status=batch.status)
