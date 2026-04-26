@@ -62,6 +62,8 @@ class MyGroupOut(CamelOrmModel):
     current_payment: MyGroupPaymentOut | None = None
     event_date: datetime | None = None
     timezone: str | None = None
+    ticket_price: int = 50000
+    payment_instructions: str | None = None
 
 
 @router.get("/portal/events/{event_id}/my-group", response_model=MyGroupOut)
@@ -101,6 +103,8 @@ def get_my_group(
         current_payment=payment_out,
         event_date=ev.event_date if ev else None,
         timezone=cfg.timezone if cfg else None,
+        ticket_price=cfg.ticket_price if cfg else 50000,
+        payment_instructions=cfg.payment_instructions if cfg else None,
     )
 
 

@@ -29,6 +29,7 @@ interface EvidenceRow {
   evidenceType: string;
   uploadedByActorType: string;
   storagePath?: string | null;
+  viewUrl?: string | null;
   fileName?: string | null;
   sizeBytes?: number | null;
   createdAt: string;
@@ -326,6 +327,7 @@ export const StaffPayments = () => {
                 }}
               >
                 {evidences.map((ev) => {
+                  const displayUrl = ev.viewUrl || ev.fileUrl;
                   const isImage = (ev.mimeType || '').startsWith('image/');
                   const isPdf = ev.mimeType === 'application/pdf';
                   return (
@@ -373,12 +375,12 @@ export const StaffPayments = () => {
                       </div>
                       {isImage && (
                         <a
-                          href={ev.fileUrl}
+                          href={displayUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
                           <img
-                            src={ev.fileUrl}
+                            src={displayUrl}
                             alt={ev.fileName || 'Evidencia'}
                             style={{
                               width: '100%',
@@ -392,7 +394,7 @@ export const StaffPayments = () => {
                       )}
                       {isPdf && (
                         <iframe
-                          src={ev.fileUrl}
+                          src={displayUrl}
                           title={ev.fileName || 'Evidencia PDF'}
                           style={{
                             width: '100%',
@@ -412,7 +414,7 @@ export const StaffPayments = () => {
                         }}
                       >
                         <a
-                          href={ev.fileUrl}
+                          href={displayUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
@@ -431,7 +433,7 @@ export const StaffPayments = () => {
                               fontSize: '0.75rem',
                               wordBreak: 'break-all',
                             }}
-                            title="Ruta en Firebase Storage"
+                            title="Ruta canónica del objeto en storage"
                           >
                             {ev.storagePath}
                           </code>

@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAuthStaff } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { apiClient } from '../../api/client';
-import { ArrowLeft, Users, Info, LayoutTemplate } from 'lucide-react';
+import { ArrowLeft, Users, Info, LayoutTemplate, Image as ImageIcon } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import { useGCSUpload } from '../../hooks/useGCSUpload';
 import { useParams, useNavigate } from 'react-router-dom';
 import { EventMap } from '../../components/ui/EventMap';
 import type { MapTable } from '../../api/types';
@@ -14,8 +16,10 @@ export const StaffMap = () => {
   
   const [layoutId, setLayoutId] = useState<string | null>(null);
   const [tables, setTables] = useState<MapTable[]>([]);
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
+  const { uploadFile, isUploading } = useGCSUpload();
 
   useEffect(() => {
     if (session) {
@@ -32,6 +36,9 @@ export const StaffMap = () => {
       );
       setLayoutId(res.layoutId);
       setTables(res.tables || []);
+      // res.backgroundImageUrl might be present if we updated the API response
+      // But let's assume it's part of the map envelope for now
+      setBackgroundImageUrl((res as any).backgroundImageUrl || '');
     } catch (err) {
       console.error("No se pudo cargar el mapa", err);
     } finally {
@@ -185,6 +192,33 @@ export const StaffMap = () => {
     }
   };
 
+  const handleBackgroundUpload = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file || !layoutId || !session) return;
+      
+      try {
+        setLoading(true);
+        const uploaded = await uploadFile(file, 'layout');
+        await apiClient.patch(`/layouts/${layoutId}/background`, 
+          { backgroundImageUrl: uploaded.fileUrl },
+          { token: session.accessToken, isBearer: true }
+        );
+        setBackgroundImageUrl(uploaded.fileUrl);
+        alert("Fondo actualizado correctamente");
+      } catch (err) {
+        console.error("Error subiendo fondo", err);
+        alert("Error al subir la imagen de fondo");
+      } finally {
+        setLoading(false);
+      }
+    };
+    input.click();
+  };
+
   if (!session) return null;
 
   return (
@@ -236,12 +270,13 @@ export const StaffMap = () => {
               ) : !layoutId ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>No hay layout configurado para el evento.</div>
               ) : (
-                <EventMap 
+                <EventMap
                   tables={tables}
                   isAdmin={!previewMode}
                   onTableMove={handleTableMove}
                   onBulkUpdate={handleBulkUpdate}
                   onTableClick={handleTableClick}
+                  backgroundImageUrl={backgroundImageUrl}
                 />
               )}
             </div>
@@ -276,6 +311,16 @@ export const StaffMap = () => {
                 <option value="entrance">Puerta de Entrada</option>
                 <option value="exit">Salida de Emergencia</option>
               </select>
+
+              <Button 
+                variant="secondary" 
+                onClick={handleBackgroundUpload} 
+                disabled={isUploading}
+                style={{ width: '100%', marginTop: '10px' }}
+              >
+                <ImageIcon size={18} style={{ marginRight: '8px' }} />
+                {isUploading ? 'Subiendo...' : 'Subir Fondo de Plano'}
+              </Button>
 
               <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '12px', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', border: '1px solid rgba(59, 130, 246, 0.3)', marginTop: '20px', color: '#93C5FD' }}>
                 <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Info size={16} /> Instucciones de Edición</strong>

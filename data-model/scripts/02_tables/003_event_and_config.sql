@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS events.event_configuration (
     max_presale_tickets INTEGER NOT NULL DEFAULT 4,
     max_sale_tickets INTEGER NOT NULL DEFAULT 3,
     map_visibility_policy VARCHAR(64) NOT NULL DEFAULT 'AFTER_PAYMENT_APPROVED',
+    ticket_price INTEGER NOT NULL DEFAULT 50000,
+    payment_instructions TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -1,0 +1,8 @@
+[
+    {
+      "origin": ["https://events-admin-prod-2026.web.app"],
+      "method": ["PUT", "GET", "HEAD", "OPTIONS"],
+      "responseHeader": ["Content-Type", "x-goog-resumable", "x-goog-meta-*"],
+      "maxAgeSeconds": 3600
+    }
+  ]

@@ -100,6 +100,8 @@ class EventConfigurationUpdate(CamelModel):
     max_presale_tickets: int = Field(default=4, ge=0)
     max_sale_tickets: int = Field(default=3, ge=0)
     map_visibility_policy: str = Field(default="AFTER_PAYMENT_APPROVED", max_length=64)
+    ticket_price: int = Field(default=50000, ge=0)
+    payment_instructions: str | None = None
     # Optional event/venue fields (contract §4.2.1). If provided, copied to the
     # Event row when the configuration is persisted; they do NOT belong to the
     # EventConfiguration table.
@@ -121,6 +123,8 @@ class EventConfigurationOut(CamelOrmModel):
     max_presale_tickets: int
     max_sale_tickets: int
     map_visibility_policy: str
+    ticket_price: int
+    payment_instructions: str | None
 
 
 _EVENT_FIELD_MAP = {
@@ -140,7 +144,24 @@ _CONFIG_FIELDS = {
     "max_presale_tickets",
     "max_sale_tickets",
     "map_visibility_policy",
+    "ticket_price",
+    "payment_instructions",
 }
+
+
+@router.get("/{event_id}/configuration", response_model=EventConfigurationOut)
+def get_configuration(
+    event_id: UUID,
+    db: DbSession,
+    staff: StaffUserDep,
+) -> EventConfiguration:
+    ensure_event_staff_access(db, staff, event_id)
+    cfg = db.execute(
+        select(EventConfiguration).where(EventConfiguration.event_id == event_id)
+    ).scalar_one_or_none()
+    if cfg is None:
+        raise HTTPException(status_code=404, detail="Configuration not found")
+    return cfg
 
 
 @router.put("/{event_id}/configuration", response_model=EventConfigurationOut)

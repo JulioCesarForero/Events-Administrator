@@ -170,12 +170,21 @@ export interface RejectPaymentBody {
 
 export interface EvidenceUrlResponse {
   uploadUrl: string;
+  bucket?: string;
+  objectKey?: string;
+  storagePath?: string;
+  expiresIn?: number;
 }
 
 export interface EvidenceRegister {
-  fileUrl: string;
+  fileUrl?: string;
+  bucket?: string;
+  objectKey?: string;
   mimeType?: string;
   evidenceType?: string;
+  storagePath?: string;
+  fileName?: string;
+  sizeBytes?: number;
 }
 
 export interface CashPaymentCreate {
@@ -348,6 +357,9 @@ export interface AuditLogEntry {
 export interface StudentImportCreate {
   fileName: string;
   fileUrl?: string;
+  objectKey?: string;
+  bucket?: string;
+  storagePath?: string;
   expectedColumns?: string[];
   rows?: Array<{ studentCode: string; firstName: string; lastName: string }>;
 }

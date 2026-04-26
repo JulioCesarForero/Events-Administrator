@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { apiClient } from '../../api/client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, UploadCloud, Edit2, Trash2, Plus, Search } from 'lucide-react';
+import { useGCSUpload } from '../../hooks/useGCSUpload';
 
 type StudentOut = {
   id: string;
@@ -19,6 +20,7 @@ export const StaffStudents = () => {
   const { session } = useAuthStaff();
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const { uploadFile, isUploading } = useGCSUpload();
 
   // Data State
   const [students, setStudents] = useState<StudentOut[]>([]);
@@ -149,14 +151,25 @@ export const StaffStudents = () => {
   };
 
   const handleImportSubmit = async () => {
+    if (!fileToUpload) return;
     setLoading(true);
     try {
+      // 1. Upload to GCS
+      const uploaded = await uploadFile(fileToUpload, 'import');
+      
+      // 2. Call backend import API with the file URL
       await apiClient.post(`/events/${eventId}/student-imports`, {
-        fileName: fileToUpload?.name || 'padron.csv',
+        fileName: fileToUpload.name,
+        fileUrl: uploaded.fileUrl,
+        objectKey: uploaded.objectKey,
+        bucket: uploaded.bucket,
+        storagePath: uploaded.storagePath,
         expectedColumns: ['codigo_unico', 'apellidos', 'nombres'],
-        rows: parsedRows
       }, { token: session?.accessToken, isBearer: true });
+
       setShowImportModal(false);
+      setFileToUpload(null);
+      setParsedRows([]);
       loadStudents(); // Recargar grid
       alert('Importación realizada exitosamente');
     } catch (err: any) {
@@ -295,8 +308,8 @@ export const StaffStudents = () => {
               <Button variant="secondary" onClick={() => { setShowImportModal(false); setFileToUpload(null); setParsedRows([]); }}>
                 Cancelar
               </Button>
-              <Button onClick={handleImportSubmit} disabled={!fileToUpload || parsedRows.length === 0} isLoading={loading}>
-                Importar
+              <Button onClick={handleImportSubmit} disabled={!fileToUpload || isUploading} isLoading={loading || isUploading}>
+                {isUploading ? 'Subiendo...' : 'Importar'}
               </Button>
             </div>
           </GlassCard>

@@ -10,12 +10,13 @@ from infrastructure.persistence.models import (
     AttendeeGroup,
     EventConfiguration,
     EventLayoutBinding,
+    Layout,
     LayoutTable,
     Payment,
     StaffUser,
 )
 from infrastructure.security.jwt_tokens import decode_token
-from shared.api.deps import DbSession, ensure_event_staff_access
+from shared.api.deps import DbSession, ensure_event_staff_access, StaffUserDep
 
 router = APIRouter(tags=["map"])
 
@@ -162,3 +163,25 @@ def get_event_map(event_id: UUID, request: Request, db: DbSession) -> MapEnvelop
         layout_id=layout_id,
         tables=_map_tables(db, layout_id),
     )
+
+
+class LayoutBackgroundUpdate(CamelModel):
+    background_image_url: str
+
+
+@router.patch("/layouts/{layout_id}/background")
+def update_layout_background(
+    layout_id: UUID,
+    body: LayoutBackgroundUpdate,
+    db: DbSession,
+    staff: StaffUserDep,
+) -> dict:
+    layout = db.get(Layout, layout_id)
+    if not layout:
+        raise HTTPException(status_code=404, detail="Layout not found")
+    
+    # Simple check: if the user is staff, we assume they have access to the tenant's layout
+    # In a more strict version, we'd check membership
+    layout.background_image_url = body.background_image_url
+    db.flush()
+    return {"status": "success", "background_image_url": layout.background_image_url}

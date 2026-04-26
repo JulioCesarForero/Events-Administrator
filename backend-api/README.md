@@ -221,6 +221,13 @@ Dentro de Compose, `DATABASE_URL` debe usar el hostname del servicio (`db`).
 | `ROOT_PATH` | Prefijo montado por Nginx (`/api` en el compose) | `""` |
 | `REDIS_URL` | Store compartido de idempotencia; vacío = in-memory | `""` |
 | `IDEMPOTENCY_TTL_SECONDS` | TTL del cache de `Idempotency-Key` | `3600` |
+| `GCS_BUCKET_NAME` | Bucket GCS para cargas firmadas (privado recomendado) | `event_bucket_evidence` |
+| `GCS_UPLOAD_URL_TTL_SECONDS` | Expiración de signed URL de subida (PUT) | `900` |
+| `GCS_DOWNLOAD_URL_TTL_SECONDS` | Expiración de signed URL de descarga (GET) | `600` |
+| `GCS_MAX_UPLOAD_SIZE_BYTES` | Tamaño máximo permitido en validación backend | `5242880` |
+| `GCS_ALLOWED_MIME_EVIDENCE` | MIMEs permitidos para comprobantes | `image/jpeg,image/png,image/webp,application/pdf` |
+| `GCS_ALLOWED_MIME_LAYOUT` | MIMEs permitidos para fondos de layout | `image/jpeg,image/png,image/webp,image/svg+xml` |
+| `GCS_ALLOWED_MIME_IMPORT` | MIMEs permitidos para CSV de importación | `text/csv,application/csv,text/plain,application/vnd.ms-excel` |
 
 Ejemplo canónico en la raíz: [`../.env.example`](../.env.example).
 

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Circle, Rect, Text, Group, Transformer } from 'react-konva';
+import { Stage, Layer, Circle, Rect, Text, Group, Transformer, Image } from 'react-konva';
+import useImage from 'use-image';
 import type { MapTable } from '../../api/types';
 import { ZoomIn, ZoomOut, Maximize, LayoutGrid, AlignLeft, AlignVerticalJustifyStart as AlignTop } from 'lucide-react';
 
@@ -12,6 +13,7 @@ interface EventMapProps {
   width?: number;
   height?: number;
   selectedSpots?: Record<string, number>; // How many spots user has selected for each table
+  backgroundImageUrl?: string;
 }
 
 function tableId(t: MapTable): string {
@@ -46,8 +48,10 @@ export const EventMap: React.FC<EventMapProps> = ({
   onBulkUpdate,
   width = 1200,
   // height is omitted since we use responsive height
-  selectedSpots = {}
+  selectedSpots = {},
+  backgroundImageUrl
 }) => {
+  const [bgImage] = useImage(backgroundImageUrl || '');
   const stageRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const trRef = useRef<any>(null);
@@ -238,6 +242,17 @@ export const EventMap: React.FC<EventMapProps> = ({
           }}
         >
           <Layer>
+            {/* Background Image */}
+            {bgImage && (
+              <Image 
+                image={bgImage} 
+                x={0} 
+                y={0} 
+                width={width}
+                height={bgImage.height * (width / bgImage.width)}
+                listening={false}
+              />
+            )}
             {/* Stage defaults/grid can be added here if needed */}
             <Rect x={width / 2 - 150} y={20} width={300} height={40} fill="rgba(255,255,255,0.05)" cornerRadius={4} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
             <Text text="ESCENARIO PRINCIPAL" x={width / 2 - 150} y={32} width={300} align="center" fontSize={10} fill="rgba(255,255,255,0.3)" fontStyle="bold" letterSpacing={3} />

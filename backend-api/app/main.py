@@ -34,6 +34,7 @@ from modules.students.api.router import router as students_router
 from modules.venues.api.router import router as venues_router
 from modules.venues.api.tables_router import router as layout_tables_router
 from shared.api.responses import problem_response
+from shared.api.storage_router import router as storage_router
 
 
 def create_app() -> FastAPI:
@@ -159,6 +160,7 @@ def create_app() -> FastAPI:
     v1.include_router(audit_router)
     v1.include_router(operations_router)
     v1.include_router(staff_admin_router)
+    v1.include_router(storage_router)
     app.include_router(v1)
 
     return app

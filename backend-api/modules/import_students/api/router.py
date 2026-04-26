@@ -1,4 +1,5 @@
 from uuid import UUID
+from urllib.parse import unquote, urlparse
 
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
@@ -25,6 +26,9 @@ class StudentRow(CamelModel):
 class ImportCreateRequest(CamelModel):
     file_name: str = Field(max_length=500)
     file_url: str | None = None
+    object_key: str | None = None
+    bucket: str | None = None
+    storage_path: str | None = None
     expected_columns: list[str] | None = None
     rows: list[StudentRow] | None = None
 
@@ -41,7 +45,14 @@ def create_import(
     db: DbSession,
     staff: StaffUserDep,
 ) -> ImportCreateResponse:
+    import csv
+    import io
+    from google.cloud import storage
+    from config.settings import settings
+
     ensure_event_staff_access(db, staff, event_id)
+    
+    # Pre-validate columns if provided in the request
     if body.expected_columns is not None:
         provided = {c.strip().lower() for c in body.expected_columns}
         if provided != REQUIRED_IMPORT_COLUMNS:
@@ -49,6 +60,7 @@ def create_import(
                 f"Import file must contain exactly columns: {sorted(REQUIRED_IMPORT_COLUMNS)}",
                 code=INVALID_PAYLOAD,
             )
+
     batch = StudentImportBatch(
         event_id=event_id,
         uploaded_by_user_id=staff.id,
@@ -57,11 +69,69 @@ def create_import(
     )
     db.add(batch)
     db.flush()
-    total = 0
+
+    rows_to_process = body.rows or []
+
+    # If no rows provided but file_url is present, download and parse from GCS
+    if not rows_to_process and (body.file_url or body.object_key or body.storage_path):
+        try:
+            object_key = body.object_key
+            bucket_name = body.bucket or settings.gcs_bucket_name
+
+            if body.storage_path and body.storage_path.startswith("gs://"):
+                _, path_part = body.storage_path.split("gs://", 1)
+                bucket_name, object_key = path_part.split("/", 1)
+            elif not object_key:
+                parsed = urlparse(body.file_url)
+                if parsed.netloc.endswith("storage.googleapis.com"):
+                    raw_path = parsed.path.lstrip("/")
+                    if "/" not in raw_path:
+                        raise ValueError("Invalid storage.googleapis.com URL format")
+                    bucket_name, object_key = raw_path.split("/", 1)
+                else:
+                    marker = f"{bucket_name}/"
+                    if marker not in body.file_url:
+                        raise ValueError("Invalid file_url for this bucket")
+                    object_key = body.file_url.split(marker, 1)[1].split("?", 1)[0]
+
+            if not object_key:
+                raise ValueError("Missing object key in upload reference")
+            object_key = unquote(object_key)
+
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(object_key)
+            
+            content = blob.download_as_text()
+            f = io.StringIO(content)
+            
+            # Detect delimiter
+            dialect = csv.Sniffer().sniff(content[:2048])
+            reader = csv.DictReader(f, dialect=dialect)
+            
+            # Normalize headers
+            reader.fieldnames = [fn.lower().strip() for fn in (reader.fieldnames or [])]
+            
+            for row in reader:
+                rows_to_process.append(
+                    StudentRow(
+                        student_code=row.get("codigo_unico", ""),
+                        first_name=row.get("nombres", ""),
+                        last_name=row.get("apellidos", "")
+                    )
+                )
+        except Exception as e:
+            batch.status = "FAILED"
+            db.flush()
+            raise HTTPException(status_code=400, detail=f"Error processing CSV from GCS: {str(e)}")
+
+    total = len(rows_to_process)
     imported = 0
-    if body.rows:
-        total = len(body.rows)
-        for row in body.rows:
+    
+    if rows_to_process:
+        for row in rows_to_process:
+            if not row.student_code:
+                continue
             db.add(
                 StudentRecord(
                     import_batch_id=batch.id,
@@ -72,12 +142,14 @@ def create_import(
                 )
             )
             imported += 1
+        
         batch.total_rows = total
         batch.imported_rows = imported
-        batch.failed_rows = 0
+        batch.failed_rows = total - imported
         batch.status = "COMPLETED"
     else:
         batch.status = "PENDING"
+        
     db.flush()
     return ImportCreateResponse(batch_id=batch.id, status=batch.status)
 

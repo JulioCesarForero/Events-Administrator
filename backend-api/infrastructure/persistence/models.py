@@ -220,6 +220,8 @@ class EventConfiguration(Base):
     max_presale_tickets: Mapped[int] = mapped_column(Integer, default=4)
     max_sale_tickets: Mapped[int] = mapped_column(Integer, default=3)
     map_visibility_policy: Mapped[str] = mapped_column(String(64), default="AFTER_PAYMENT_APPROVED")
+    ticket_price: Mapped[int] = mapped_column(Integer, default=50000)
+    payment_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

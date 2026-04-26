@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from urllib.parse import unquote, urlparse
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import AliasChoices, Field, computed_field
@@ -338,15 +339,30 @@ def create_cash_payment(
 
 class EvidenceUrlResponse(CamelModel):
     upload_url: str
+    bucket: str
+    object_key: str
+    storage_path: str
+    expires_in: int
+
+
+class EvidenceUploadUrlRequest(CamelModel):
+    mime_type: str = Field(default="application/octet-stream", max_length=150)
+    file_name: str = Field(default="evidence.bin", max_length=300)
+    size_bytes: int | None = Field(default=None, ge=0)
 
 
 @router.post("/payments/{payment_id}/evidence-upload-url", response_model=EvidenceUrlResponse)
 def evidence_upload_url(
     payment_id: UUID,
+    body: EvidenceUploadUrlRequest,
     db: DbSession,
     claims: BuyerClaimsDep,
 ) -> EvidenceUrlResponse:
-    from infrastructure.storage.signed_urls import generate_upload_url
+    from infrastructure.storage.signed_urls import (
+        build_object_ref,
+        generate_upload_url,
+        validate_upload_constraints,
+    )
     from config.settings import settings
 
     p = db.get(Payment, payment_id)
@@ -361,16 +377,38 @@ def evidence_upload_url(
     
     ev = db.get(Event, p.event_id)
     tenant_id = ev.tenant_id if ev else "default-tenant"
-    
-    url = generate_upload_url(
-        bucket=settings.gcs_bucket_name,
-        object_key=f"tenants/{tenant_id}/events/{p.event_id}/payments/{payment_id}/{uuid4().hex}",
+
+    validate_upload_constraints(
+        purpose="evidence",
+        content_type=body.mime_type,
+        size_bytes=body.size_bytes,
     )
-    return EvidenceUrlResponse(upload_url=url)
+    
+    object_ref = build_object_ref(
+        purpose="evidence",
+        filename=body.file_name or "evidence.bin",
+        tenant_id=str(tenant_id),
+        event_id=str(p.event_id),
+        payment_id=str(payment_id),
+    )
+    url = generate_upload_url(
+        bucket=object_ref.bucket,
+        object_key=object_ref.object_key,
+        content_type=body.mime_type,
+    )
+    return EvidenceUrlResponse(
+        upload_url=url,
+        bucket=object_ref.bucket,
+        object_key=object_ref.object_key,
+        storage_path=object_ref.storage_path,
+        expires_in=settings.gcs_upload_url_ttl_seconds,
+    )
 
 
 class EvidenceRegister(CamelModel):
-    file_url: str
+    file_url: str | None = None
+    bucket: str | None = None
+    object_key: str | None = None
     mime_type: str | None = None
     evidence_type: str = Field(default="DIGITAL_PROOF", max_length=64)
     storage_path: str | None = None
@@ -385,17 +423,50 @@ def register_evidence(
     db: DbSession,
     claims: BuyerClaimsDep,
 ) -> dict:
+    from config.settings import settings
+
+    def _parse_object_ref() -> tuple[str | None, str | None, str | None]:
+        if body.storage_path and body.storage_path.startswith("gs://"):
+            _, path_part = body.storage_path.split("gs://", 1)
+            bucket, key = path_part.split("/", 1)
+            return bucket, key, f"https://storage.googleapis.com/{bucket}/{key}"
+        if body.bucket and body.object_key:
+            return body.bucket, body.object_key, f"https://storage.googleapis.com/{body.bucket}/{body.object_key}"
+        if body.file_url:
+            parsed = urlparse(body.file_url)
+            if parsed.netloc.endswith("storage.googleapis.com"):
+                path = parsed.path.lstrip("/")
+                if "/" in path:
+                    bucket, key = path.split("/", 1)
+                    return bucket, unquote(key), body.file_url
+            marker = f"{settings.gcs_bucket_name}/"
+            if marker in body.file_url:
+                key = unquote(body.file_url.split(marker, 1)[1].split("?", 1)[0])
+                bucket = settings.gcs_bucket_name
+                return bucket, key, body.file_url.split("?", 1)[0]
+        return None, None, body.file_url
+
     p = db.get(Payment, payment_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     _buyer_group(db, claims, p.attendee_group_id)
+    bucket, object_key, fallback_url = _parse_object_ref()
+    canonical_storage_path = body.storage_path
+    if not canonical_storage_path and bucket and object_key:
+        canonical_storage_path = f"gs://{bucket}/{object_key}"
+    canonical_file_url = fallback_url
+    if bucket and object_key:
+        canonical_file_url = f"https://storage.googleapis.com/{bucket}/{object_key}"
+    if not canonical_file_url:
+        raise HTTPException(status_code=400, detail="Missing file reference")
+
     ev = PaymentEvidence(
         payment_id=payment_id,
-        file_url=body.file_url,
+        file_url=canonical_file_url,
         mime_type=body.mime_type,
         evidence_type=body.evidence_type,
         uploaded_by_actor_type="BUYER",
-        storage_path=body.storage_path,
+        storage_path=canonical_storage_path,
         file_name=body.file_name,
         size_bytes=body.size_bytes,
     )
@@ -412,6 +483,7 @@ class EvidenceOut(CamelOrmModel):
     evidence_type: str
     uploaded_by_actor_type: str
     storage_path: str | None = None
+    view_url: str | None = None
     file_name: str | None = None
     size_bytes: int | None = None
     created_at: datetime
@@ -423,14 +495,29 @@ def list_payment_evidences(
     db: DbSession,
     staff: StaffUserDep,
 ) -> list[PaymentEvidence]:
+    from infrastructure.storage.signed_urls import generate_download_url
+
+    def _signed_view_url(row: PaymentEvidence) -> str | None:
+        if not row.storage_path or not row.storage_path.startswith("gs://"):
+            return None
+        _, path_part = row.storage_path.split("gs://", 1)
+        bucket, key = path_part.split("/", 1)
+        try:
+            return generate_download_url(bucket=bucket, object_key=key)
+        except Exception:
+            return None
+
     p = db.get(Payment, payment_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     ensure_event_staff_access(db, staff, p.event_id)
-    return list(
+    evidences = list(
         db.execute(
             select(PaymentEvidence)
             .where(PaymentEvidence.payment_id == payment_id)
             .order_by(PaymentEvidence.created_at.desc())
         ).scalars()
     )
+    for evidence in evidences:
+        setattr(evidence, "view_url", _signed_view_url(evidence) or evidence.file_url)
+    return evidences

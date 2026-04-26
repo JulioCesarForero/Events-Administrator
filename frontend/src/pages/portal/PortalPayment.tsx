@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuthPortal } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Input } from '../../components/ui/Input';
@@ -24,16 +24,35 @@ const EVIDENCE_MAX_MB = Number(
 
 interface UploadResult {
   fileUrl: string;
+  bucket?: string;
+  objectKey?: string;
   storagePath?: string;
   fileName?: string;
   sizeBytes?: number;
   mimeType: string;
 }
 
+const inferMimeType = (file: File): string => {
+  const declared = (file.type || '').trim().toLowerCase();
+  if (declared && declared !== 'application/octet-stream') return declared;
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const byExt: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    pdf: 'application/pdf',
+    heic: 'image/heic',
+    heif: 'image/heif',
+  };
+  return byExt[ext] || 'application/octet-stream';
+};
+
 export const PortalPayment = () => {
   const { session } = useAuthPortal();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [initLoading, setInitLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [step, setStep] = useState(1);
   const [paymentType, setPaymentType] = useState<PaymentType>('DIGITAL');
@@ -43,7 +62,27 @@ export const PortalPayment = () => {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const TICKET_PRICE = 50_000; // COP
+  const [ticketPrice, setTicketPrice] = useState(50000);
+  const [paymentInstructions, setPaymentInstructions] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+    const fetchConfig = async () => {
+      try {
+        const res = await apiClient.get<any>(
+          `/portal/events/${session.eventId}/my-group`,
+          { token: session.sessionToken, isBearer: true }
+        );
+        setTicketPrice(res.ticketPrice ?? 50000);
+        setPaymentInstructions(res.paymentInstructions || null);
+      } catch (err) {
+        console.error('Error fetching group/config:', err);
+      } finally {
+        setInitLoading(false);
+      }
+    };
+    fetchConfig();
+  }, [session]);
 
   const handleCreatePayment = async () => {
     if (!session) return;
@@ -55,7 +94,7 @@ export const PortalPayment = () => {
         {
           paymentType,
           ticketQuantity,
-          amountCents: ticketQuantity * TICKET_PRICE * 100,
+          amountCents: ticketQuantity * ticketPrice * 100,
           currency: 'COP',
         },
         { token: session.sessionToken, isBearer: true },
@@ -98,12 +137,24 @@ export const PortalPayment = () => {
 
   const uploadEvidence = async (file: File): Promise<UploadResult> => {
     if (!session) throw new Error('Sin sesión');
-    const mimeType = file.type || 'application/octet-stream';
+    const mimeType = inferMimeType(file);
+    if (mimeType === 'application/octet-stream') {
+      throw new Error('No se pudo detectar el tipo de archivo. Usa JPG, PNG, WEBP o PDF.');
+    }
 
     // Request Signed URL from backend
-    const res = await apiClient.post<{ uploadUrl: string }>(
+    const res = await apiClient.post<{
+      uploadUrl: string;
+      bucket?: string;
+      objectKey?: string;
+      storagePath?: string;
+    }>(
       `/payments/${paymentId}/evidence-upload-url`,
-      {},
+      {
+        mimeType,
+        fileName: file.name,
+        sizeBytes: file.size,
+      },
       { token: session.sessionToken, isBearer: true },
     );
     
@@ -123,6 +174,9 @@ export const PortalPayment = () => {
 
     return {
       fileUrl: baseUrl || res.uploadUrl,
+      bucket: res.bucket,
+      objectKey: res.objectKey,
+      storagePath: res.storagePath,
       fileName: file.name,
       sizeBytes: file.size,
       mimeType,
@@ -144,8 +198,10 @@ export const PortalPayment = () => {
         `/payments/${paymentId}/evidence`,
         {
           fileUrl: uploaded.fileUrl,
+          bucket: uploaded.bucket,
+          objectKey: uploaded.objectKey,
           mimeType: uploaded.mimeType,
-          evidenceType: 'RECEIPT',
+          evidenceType: 'DIGITAL_PROOF',
           storagePath: uploaded.storagePath,
           fileName: uploaded.fileName,
           sizeBytes: uploaded.sizeBytes,
@@ -170,6 +226,14 @@ export const PortalPayment = () => {
   };
 
   if (!session) return null;
+
+  if (initLoading) {
+    return (
+      <div className="animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center', padding: '40px' }}>
+        <p style={{ color: 'var(--text-secondary)' }}>Cargando información del pago...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-slide-up" style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -295,7 +359,7 @@ export const PortalPayment = () => {
             >
               <span>Total a pagar:</span>
               <strong style={{ fontSize: '1.25rem', color: 'var(--accent-primary)' }}>
-                ${(ticketQuantity * TICKET_PRICE).toLocaleString('es-CO')} COP
+                ${(ticketQuantity * ticketPrice).toLocaleString('es-CO')} COP
               </strong>
             </div>
 
@@ -306,11 +370,17 @@ export const PortalPayment = () => {
               >
                 <strong style={{ color: 'var(--text-primary)' }}>Datos bancarios:</strong>
                 <br />
-                Banco: Bancolombia — Cuenta Ahorros 123-456789-00
-                <br />
-                Titular: Comité de Grado 2026
-                <br />
-                Referencia: Tu código de estudiante
+                {paymentInstructions ? (
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{paymentInstructions}</span>
+                ) : (
+                  <>
+                    Banco: Bancolombia — Cuenta Ahorros 123-456789-00
+                    <br />
+                    Titular: Comité de Grado 2026
+                    <br />
+                    Referencia: Tu código de estudiante
+                  </>
+                )}
               </div>
             ) : (
               <div
@@ -439,3 +509,4 @@ export const PortalPayment = () => {
     </div>
   );
 };
+

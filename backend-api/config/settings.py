@@ -39,8 +39,30 @@ class Settings(BaseSettings):
     )
 
     gcs_bucket_name: str = Field(
-        default="events-admin-prod-2026", validation_alias="GCS_BUCKET_NAME"
+        default="event_bucket_evidence", validation_alias="GCS_BUCKET_NAME"
     )
+    gcs_upload_url_ttl_seconds: int = Field(
+        default=900, validation_alias="GCS_UPLOAD_URL_TTL_SECONDS"
+    )
+    gcs_download_url_ttl_seconds: int = Field(
+        default=600, validation_alias="GCS_DOWNLOAD_URL_TTL_SECONDS"
+    )
+    gcs_max_upload_size_bytes: int = Field(
+        default=5 * 1024 * 1024, validation_alias="GCS_MAX_UPLOAD_SIZE_BYTES"
+    )
+    gcs_allowed_mime_evidence: str = Field(
+        default="image/jpeg,image/png,image/webp,application/pdf",
+        validation_alias="GCS_ALLOWED_MIME_EVIDENCE",
+    )
+    gcs_allowed_mime_layout: str = Field(
+        default="image/jpeg,image/png,image/webp,image/svg+xml",
+        validation_alias="GCS_ALLOWED_MIME_LAYOUT",
+    )
+    gcs_allowed_mime_import: str = Field(
+        default="text/csv,application/csv,text/plain,application/vnd.ms-excel",
+        validation_alias="GCS_ALLOWED_MIME_IMPORT",
+    )
+    schema_guard_mode: str = Field(default="warn", validation_alias="SCHEMA_GUARD_MODE")
 
 
 @lru_cache

@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "MVP": "events-admin-prod-2026"
+  },
+  "targets": {
+    "events-admin-prod-2026": {
+      "hosting": {
+        "main": [
+          "events-admin-prod-2026"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

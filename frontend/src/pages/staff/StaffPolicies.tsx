@@ -43,6 +43,11 @@ export const StaffPolicies = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configData, setConfigData] = useState<any>(null);
+  const [configForm, setConfigForm] = useState({ ticketPrice: 50000, paymentInstructions: '' });
+
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
   const [currentType, setCurrentType] = useState<DocType>('DATA_POLICY');
@@ -68,9 +73,30 @@ export const StaffPolicies = () => {
     }
   }, [session, eventId]);
 
+  const loadConfig = useCallback(async () => {
+    if (!session || !eventId) return;
+    setConfigLoading(true);
+    try {
+      const res = await apiClient.get<any>(
+        `/events/${eventId}/configuration`,
+        { token: session.accessToken, isBearer: true },
+      );
+      setConfigData(res);
+      setConfigForm({
+        ticketPrice: res.ticketPrice ?? 50000,
+        paymentInstructions: res.paymentInstructions || '',
+      });
+    } catch (err) {
+      console.error('Error loading config', err);
+    } finally {
+      setConfigLoading(false);
+    }
+  }, [session, eventId]);
+
   useEffect(() => {
     loadDocs();
-  }, [loadDocs]);
+    loadConfig();
+  }, [loadDocs, loadConfig]);
 
   const openCreate = (type: DocType) => {
     setEditorMode('create');
@@ -143,6 +169,29 @@ export const StaffPolicies = () => {
       setError(msg);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const saveConfig = async () => {
+    if (!session || !eventId || !configData) return;
+    setConfigSaving(true);
+    try {
+      await apiClient.put(
+        `/events/${eventId}/configuration`,
+        {
+          ...configData,
+          ticketPrice: configForm.ticketPrice,
+          paymentInstructions: configForm.paymentInstructions,
+        },
+        { token: session.accessToken, isBearer: true }
+      );
+      alert('Configuración guardada exitosamente');
+      loadConfig();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'No se pudo guardar la configuración';
+      alert(msg);
+    } finally {
+      setConfigSaving(false);
     }
   };
 
@@ -265,6 +314,45 @@ export const StaffPolicies = () => {
           ))}
         </GlassCard>
       ))}
+
+      <GlassCard style={{ marginBottom: '20px' }}>
+        <h3 style={{ margin: '0 0 16px 0' }}>Configuración de Pagos</h3>
+        {configLoading ? (
+          <p style={{ color: 'var(--text-secondary)' }}>Cargando configuración…</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ maxWidth: '300px' }}>
+              <Input
+                label="Precio de la boleta (COP)"
+                type="number"
+                min="0"
+                value={configForm.ticketPrice}
+                onChange={(e) => setConfigForm({ ...configForm, ticketPrice: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                Instrucciones de Pago (Canales autorizados)
+              </label>
+              <textarea
+                className="glass-input"
+                style={{ minHeight: '120px', resize: 'vertical' }}
+                value={configForm.paymentInstructions}
+                onChange={(e) => setConfigForm({ ...configForm, paymentInstructions: e.target.value })}
+                placeholder="Ej. Banco: Bancolombia — Cuenta Ahorros..."
+              />
+              <small style={{ color: 'var(--text-muted)' }}>
+                Este texto se mostrará a los estudiantes en el Paso 1 del proceso de pago.
+              </small>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={saveConfig} isLoading={configSaving} icon={Save}>
+                Guardar Configuración
+              </Button>
+            </div>
+          </div>
+        )}
+      </GlassCard>
 
       <Modal
         isOpen={editorOpen}

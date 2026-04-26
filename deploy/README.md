@@ -66,6 +66,45 @@ gcloud services enable artifactregistry.googleapis.com
 
 > **Nota**: Reemplaza `events-admin-prod` con un ID único para tu proyecto.
 
+### Configurar Permisos IAM (Obligatorio para proyectos nuevos)
+
+Por defecto, los nuevos proyectos de Google Cloud no otorgan automáticamente permisos al Service Account de Compute Engine, lo que causa errores al desplegar (fallos al acceder a Artifact Registry o Cloud Storage). Ejecuta esto:
+
+```powershell
+# Obtener el número del proyecto
+$PROJECT_NUMBER = gcloud projects describe events-admin-prod --format="value(projectNumber)"
+
+# Otorgar permisos de Storage y Artifact Registry al Service Account por defecto
+gcloud projects add-iam-policy-binding events-admin-prod `
+  --member="serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com" `
+  --role="roles/storage.admin"
+
+gcloud projects add-iam-policy-binding events-admin-prod `
+  --member="serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com" `
+  --role="roles/artifactregistry.admin"
+```
+
+### Permiso adicional para Signed URLs (evidencias de pago)
+
+Para que Cloud Run pueda firmar URLs de Google Cloud Storage sin usar un archivo de clave privada, el Service Account de runtime debe poder llamar a `iamcredentials.googleapis.com` (`signBlob`).
+
+```powershell
+# Habilitar IAM Service Account Credentials API
+gcloud services enable iamcredentials.googleapis.com
+
+# Obtener el service account de runtime del servicio Cloud Run
+$RUNTIME_SA = gcloud run services describe events-backend `
+  --region=us-central1 `
+  --format="value(spec.template.spec.serviceAccountName)"
+
+# Dar permiso de firmar tokens/blobs sobre sí mismo
+gcloud iam service-accounts add-iam-policy-binding $RUNTIME_SA `
+  --member="serviceAccount:$RUNTIME_SA" `
+  --role="roles/iam.serviceAccountTokenCreator"
+```
+
+Si este permiso falta, `POST /api/v1/payments/{id}/evidence-upload-url` puede fallar con `500` y un error de credenciales sin clave privada al generar la Signed URL.
+
 ---
 
 ## Paso 2: Crear base de datos en Neon
@@ -300,3 +339,30 @@ firebase deploy --only hosting
 | `404` en rutas SPA | `firebase.json` mal configurado | Verificar que el rewrite `**` → `/index.html` está presente |
 | Build falla en Cloud Build | Dependencias / Dockerfile | `gcloud builds log` para ver el error detallado |
 | `MODULE_NOT_FOUND` en Cloud Run | `.gcloudignore` excluye archivos necesarios | Revisar qué se excluye |
+
+
+
+---
+
+
+gcloud run deploy events-backend --source ./backend-api --region us-central1
+
+
+
+
+
+---
+
+
+firebase hosting:sites:create events-admin-prod-2026 --project events-admin-prod-2026
+
+
+firebase target:apply hosting main events-admin-prod-2026 --project events-admin-prod-2026
+firebase deploy --only hosting:main --project events-admin-prod-2026
+
+
+
+firebase deploy --only hosting:main --project events-admin-prod-2026
+
+---
+
