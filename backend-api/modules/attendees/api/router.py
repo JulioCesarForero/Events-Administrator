@@ -14,7 +14,9 @@ from infrastructure.persistence.models import (
     EventConfiguration,
     Participant,
     Payment,
+    Reservation,
     StaffUser,
+    TableReservation,
 )
 from modules.attendees.domain.rules import ensure_participant_editable_window
 from domain.error_codes import PARTICIPANT_LIMIT_EXCEEDED
@@ -23,6 +25,7 @@ from modules.payments.application.stage_capacity import (
     current_max_participants_per_group,
     latest_approved_payment_id,
     sum_approved_tickets_for_group,
+    sum_confirmed_reservation_spots,
 )
 from shared.api.deps import (
     BuyerClaimsDep,
@@ -89,6 +92,14 @@ class MyGroupOut(CamelOrmModel):
     display_name: str | None
     reservation_status: str
     approved_ticket_count: int
+    active_spots_reserved: int = Field(
+        default=0,
+        description="RN-RES-08: sum of total_spots_reserved on CONFIRMED reservations for this event.",
+    )
+    available_reservation_balance: int = Field(
+        default=0,
+        description="RN-RES-08: approved_ticket_count minus active_spots_reserved (floored at 0).",
+    )
     current_payment_id: UUID | None = None
     latest_approved_payment_id: UUID | None = None
     current_payment: MyGroupPaymentOut | None = None
@@ -127,6 +138,8 @@ def get_my_group(
             rejected_at=pay.rejected_at,
         )
     approved_sum = sum_approved_tickets_for_group(db, g.id, event_id)
+    active_reserved = sum_confirmed_reservation_spots(db, g.id, event_id)
+    available_balance = max(0, approved_sum - active_reserved)
     last_appr = latest_approved_payment_id(db, g.id, event_id)
     max_participants = current_max_participants_per_group(cfg) if cfg is not None else 4
     return MyGroupOut(
@@ -136,6 +149,8 @@ def get_my_group(
         display_name=g.display_name,
         reservation_status=g.reservation_status,
         approved_ticket_count=approved_sum,
+        active_spots_reserved=active_reserved,
+        available_reservation_balance=available_balance,
         current_payment_id=g.current_payment_id,
         latest_approved_payment_id=last_appr,
         current_payment=payment_out,
@@ -145,6 +160,66 @@ def get_my_group(
         payment_instructions=cfg.payment_instructions if cfg else None,
         max_participants_allowed=max_participants,
     )
+
+
+class MyReservationAllocationOut(CamelModel):
+    layout_table_id: UUID
+    spots_reserved: int
+
+
+class MyReservationOut(CamelModel):
+    reservation_id: UUID
+    total_spots_reserved: int
+    status: str
+    created_at: datetime | None = None
+    allocations: list[MyReservationAllocationOut]
+
+
+@router.get("/portal/events/{event_id}/my-reservations", response_model=list[MyReservationOut])
+def get_my_reservations(
+    event_id: UUID,
+    db: DbSession,
+    claims: BuyerClaimsDep,
+) -> list[MyReservationOut]:
+    """List CONFIRMED reservations for the buyer group (portal read-only summary)."""
+    g = _get_group_for_buyer(db, claims, event_id)
+    reservations = list(
+        db.execute(
+            select(Reservation)
+            .where(
+                Reservation.attendee_group_id == g.id,
+                Reservation.event_id == event_id,
+                Reservation.status == "CONFIRMED",
+            )
+            .order_by(Reservation.created_at.asc())
+        ).scalars().all()
+    )
+    out: list[MyReservationOut] = []
+    for res in reservations:
+        trs = list(
+            db.execute(
+                select(TableReservation).where(
+                    TableReservation.reservation_id == res.id,
+                    TableReservation.status == "ACTIVE",
+                )
+            ).scalars().all()
+        )
+        out.append(
+            MyReservationOut(
+                reservation_id=res.id,
+                total_spots_reserved=res.total_spots_reserved,
+                status=res.status,
+                created_at=res.created_at,
+                allocations=[
+                    MyReservationAllocationOut(
+                        layout_table_id=tr.layout_table_id,
+                        spots_reserved=tr.spots_reserved,
+                    )
+                    for tr in trs
+                ],
+            )
+        )
+    return out
 
 
 class ParticipantCreate(CamelModel):

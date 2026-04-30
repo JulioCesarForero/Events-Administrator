@@ -14,6 +14,10 @@ interface EventMapProps {
   height?: number;
   selectedSpots?: Record<string, number>; // How many spots user has selected for each table
   backgroundImageUrl?: string;
+  /** Buyer-only: no table taps, map is for display (e.g. “Ver mi reserva”). */
+  readOnlyViewer?: boolean;
+  /** tableId → cupos ya reservados por el grupo (solo lectura). */
+  reservedSpotsDisplay?: Record<string, number>;
 }
 
 function tableId(t: MapTable): string {
@@ -49,7 +53,9 @@ export const EventMap: React.FC<EventMapProps> = ({
   width = 1200,
   // height is omitted since we use responsive height
   selectedSpots = {},
-  backgroundImageUrl
+  backgroundImageUrl,
+  readOnlyViewer = false,
+  reservedSpotsDisplay = {},
 }) => {
   const [bgImage] = useImage(backgroundImageUrl || '');
   const stageRef = useRef<any>(null);
@@ -207,7 +213,7 @@ export const EventMap: React.FC<EventMapProps> = ({
 
       <div 
         ref={containerRef} 
-        className="bg-[rgba(0,0,0,0.2)] rounded-2xl overflow-hidden border border-[var(--border-light)] relative cursor-crosshair min-h-[560px]"
+        className={`bg-[rgba(0,0,0,0.2)] rounded-2xl overflow-hidden border border-[var(--border-light)] relative min-h-[560px] ${readOnlyViewer ? 'cursor-default' : 'cursor-crosshair'}`}
         style={{ height: `${mapCanvasHeight}px` }}
       >
         <Stage 
@@ -267,22 +273,32 @@ export const EventMap: React.FC<EventMapProps> = ({
               const isSelectedForEdit = isAdmin && selectedIds.includes(tid);
               const spotsSelectedByUser = selectedSpots[tid] || 0;
               const isSelectedByUser = spotsSelectedByUser > 0;
-              
-              // Base colors setup based on semaphore (available spots vs capacity)
+              const spotsReservedView = reservedSpotsDisplay[tid] || 0;
+              const isReservedHighlight = !isAdmin && spotsReservedView > 0;
+              const isDecoration = ['stage', 'dancefloor', 'entrance', 'exit'].includes(category);
+
+              // Base colors: semáforo por mesa; decoraciones fijas; resaltado “mis cupos” no lo pisan las decoraciones.
               let baseColor = isFull ? 'rgba(239, 68, 68, 0.2)' : occupied > 0 ? 'rgba(234, 179, 8, 0.2)' : 'rgba(34, 197, 94, 0.2)';
               let borderColor = isFull ? 'rgba(239, 68, 68, 0.6)' : occupied > 0 ? 'rgba(234, 179, 8, 0.6)' : 'rgba(34, 197, 94, 0.6)';
 
-              // User selection overrides
-              if (!isAdmin && isSelectedByUser) {
-                 baseColor = 'rgba(57, 255, 20, 0.25)';
-                 borderColor = 'var(--accent-primary)';
+              if (isDecoration) {
+                if (category === 'stage') {
+                  baseColor = 'rgba(56, 189, 248, 0.15)';
+                  borderColor = 'rgba(56, 189, 248, 0.4)';
+                } else if (category === 'dancefloor') {
+                  baseColor = 'rgba(255, 255, 255, 0.05)';
+                  borderColor = 'rgba(255, 255, 255, 0.2)';
+                } else if (category === 'exit' || category === 'entrance') {
+                  baseColor = 'rgba(244, 63, 94, 0.1)';
+                  borderColor = 'rgba(244, 63, 94, 0.4)';
+                }
+              } else if (!isAdmin && isReservedHighlight) {
+                baseColor = 'rgba(59, 130, 246, 0.3)';
+                borderColor = 'rgba(186, 230, 253, 0.95)';
+              } else if (!isAdmin && isSelectedByUser) {
+                baseColor = 'rgba(57, 255, 20, 0.25)';
+                borderColor = 'var(--accent-primary)';
               }
-
-              if (category === 'stage') { baseColor = 'rgba(56, 189, 248, 0.15)'; borderColor = 'rgba(56, 189, 248, 0.4)'; }
-              else if (category === 'dancefloor') { baseColor = 'rgba(255, 255, 255, 0.05)'; borderColor = 'rgba(255, 255, 255, 0.2)'; }
-              else if (category === 'exit' || category === 'entrance') { baseColor = 'rgba(244, 63, 94, 0.1)'; borderColor = 'rgba(244, 63, 94, 0.4)'; }
-              
-              const isDecoration = ['stage', 'dancefloor', 'entrance', 'exit'].includes(category);
               const pos = tablePosition(table);
 
               return (
@@ -299,6 +315,7 @@ export const EventMap: React.FC<EventMapProps> = ({
                   }}
                   onClick={(e) => {
                     if (!isAdmin) {
+                      if (readOnlyViewer) return;
                       if (!isDecoration && onTableClick) onTableClick(table);
                       return;
                     }
@@ -311,6 +328,7 @@ export const EventMap: React.FC<EventMapProps> = ({
                   }}
                   onTap={() => {
                     if (!isAdmin) {
+                      if (readOnlyViewer) return;
                       if (!isDecoration && onTableClick) onTableClick(table);
                       return;
                     }
@@ -357,10 +375,16 @@ export const EventMap: React.FC<EventMapProps> = ({
                       listening={false}
                     />
                   )}
-                  {!isAdmin && spotsSelectedByUser > 0 && !isDecoration && (
+                  {!isAdmin && spotsReservedView > 0 && !isDecoration && (
+                    <Circle radius={10} fill="rgba(59, 130, 246, 0.95)" x={20} y={-20} listening={false} />
+                  )}
+                  {!isAdmin && spotsReservedView > 0 && !isDecoration && (
+                    <Text text={`${spotsReservedView}`} fontSize={10} fill="#fff" fontStyle="bold" x={10} y={-25} width={20} align="center" listening={false} />
+                  )}
+                  {!isAdmin && spotsReservedView === 0 && spotsSelectedByUser > 0 && !isDecoration && (
                     <Circle radius={10} fill="var(--accent-primary)" x={20} y={-20} listening={false} />
                   )}
-                  {!isAdmin && spotsSelectedByUser > 0 && !isDecoration && (
+                  {!isAdmin && spotsReservedView === 0 && spotsSelectedByUser > 0 && !isDecoration && (
                     <Text text={`${spotsSelectedByUser}`} fontSize={10} fill="#000" fontStyle="bold" x={10} y={-25} width={20} align="center" listening={false} />
                   )}
                 </Group>

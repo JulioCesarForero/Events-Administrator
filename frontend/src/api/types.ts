@@ -97,6 +97,10 @@ export interface MyGroup {
   displayName: string | null;
   reservationStatus: ReservationStatus;
   approvedTicketCount: number;
+  /** RN-RES-08: cupos ya en reservas CONFIRMED para este evento (suma de totalSpotsReserved). */
+  activeSpotsReserved?: number;
+  /** RN-RES-08: cupos que aún puedes reservar (servidor). */
+  availableReservationBalance?: number;
   currentPaymentId?: string | null;
   /** Latest APPROVED payment id — use for reservation POST when tickets span several pagos. */
   latestApprovedPaymentId?: string | null;
@@ -107,6 +111,19 @@ export interface MyGroup {
 /* =========================================================================
  * Attendees / participants
  * ========================================================================= */
+
+export interface MyReservationAllocation {
+  layoutTableId: string;
+  spotsReserved: number;
+}
+
+export interface MyReservationSummary {
+  reservationId: string;
+  totalSpotsReserved: number;
+  status: string;
+  createdAt?: string | null;
+  allocations: MyReservationAllocation[];
+}
 
 export type DocumentType = 'CC' | 'TI' | 'CE' | string;
 

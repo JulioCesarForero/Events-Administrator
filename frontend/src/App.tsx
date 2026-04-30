@@ -10,6 +10,7 @@ import { PortalDashboard } from './pages/portal/PortalDashboard';
 import { PortalAttendees } from './pages/portal/PortalAttendees';
 import { PortalPayment } from './pages/portal/PortalPayment';
 import { PortalMap } from './pages/portal/PortalMap';
+import { PortalMyReservations } from './pages/portal/PortalMyReservations';
 import { PortalPaymentStatus } from './pages/portal/PortalPaymentStatus';
 import { PortalLanding } from './pages/portal/PortalLanding';
 import { StaffLogin } from './pages/staff/StaffLogin';
@@ -217,6 +218,14 @@ export default function App() {
               <Route path="payment" element={<RequireBuyerAuth><PortalPayment /></RequireBuyerAuth>} />
               <Route path="payment-status" element={<RequireBuyerAuth><PortalPaymentStatus /></RequireBuyerAuth>} />
               <Route path="map" element={<RequireBuyerAuth><PortalMap /></RequireBuyerAuth>} />
+              <Route
+                path="my-reservations"
+                element={
+                  <RequireBuyerAuth>
+                    <PortalMyReservations />
+                  </RequireBuyerAuth>
+                }
+              />
               <Route path="" element={<Navigate to="login" />} />
             </Routes>
           </PortalLayout>

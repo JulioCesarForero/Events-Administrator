@@ -3,7 +3,6 @@
 import pytest
 
 from domain.error_codes import (
-    GROUP_ALREADY_RESERVED,
     PAYMENT_NOT_APPROVED,
     RESERVATION_EXCEEDS_APPROVED_TICKETS,
     TABLE_CAPACITY_CONFLICT,
@@ -30,13 +29,13 @@ class TestReservationCapacity:
         assert requested <= free
 
     def test_total_spots_must_match_ticket_quantity(self):
-        """RN-RES-01: sum(allocations.spots) == approved ticket quantity."""
+        """En una sola operación el total puede ser parcial respecto al tope aprobado (RN-RES-08)."""
         approved_tickets = 3
-        allocations_total = 2  # Mismatch
-        assert allocations_total != approved_tickets
+        allocations_total = 2
+        assert allocations_total < approved_tickets
 
     def test_total_spots_match_is_valid(self):
-        """RN-RES-01: matching totals should pass."""
+        """Reservar el total aprobado en una sola operación sigue siendo válido."""
         approved_tickets = 3
         allocations_total = 3
         assert allocations_total == approved_tickets
@@ -49,9 +48,14 @@ class TestReservationPrerequisites:
         """INV-03: reservation only with APPROVED payment."""
         assert PAYMENT_NOT_APPROVED == "PAYMENT_NOT_APPROVED"
 
-    def test_group_cannot_reserve_twice(self):
-        """RN-RES: group with CONFIRMED status cannot create a new reservation."""
-        assert GROUP_ALREADY_RESERVED == "GROUP_ALREADY_RESERVED"
+    def test_rn_res_08_cumulative_balance(self):
+        """RN-RES-08: requested + active_reserved must not exceed approved."""
+        approved = 4
+        active_reserved = 2
+        assert 3 + active_reserved > approved
+        assert 2 + active_reserved <= approved
+        active_reserved = 4
+        assert 1 + active_reserved > approved
 
     def test_error_code_for_capacity_conflict(self):
         """Verify correct error code for capacity conflicts."""

@@ -9,7 +9,6 @@ from shared.api.schemas import CamelModel
 from domain.exceptions import ConflictError, ValidationError
 from infrastructure.persistence.audit import append_audit_log
 from infrastructure.persistence.models import (
-    AttendeeGroup,
     Event,
     LayoutTable,
     Payment,
@@ -17,6 +16,8 @@ from infrastructure.persistence.models import (
     TableReservation,
 )
 from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
+
+from modules.reservations.application.reservation_service import recompute_group_reservation_status
 
 router = APIRouter(tags=["operations"])
 
@@ -69,9 +70,9 @@ def manual_adjustment(
                 t.current_occupied_spots = max(0, t.current_occupied_spots - tr.spots_reserved)
             tr.status = "RELEASED"
         res.status = "RELEASED"
-        grp = db.get(AttendeeGroup, res.attendee_group_id)
-        if grp:
-            grp.reservation_status = "NONE"
+        recompute_group_reservation_status(
+            db, group_id=res.attendee_group_id, event_id=event_id
+        )
 
     elif body.action == "UPDATE_TABLE_CAPACITY":
         table_id = payload.get("layout_table_id")

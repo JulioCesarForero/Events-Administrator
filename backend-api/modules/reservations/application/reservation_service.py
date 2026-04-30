@@ -1,14 +1,16 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from modules.payments.application.stage_capacity import sum_approved_tickets_for_group
+from modules.payments.application.stage_capacity import (
+    sum_approved_tickets_for_group,
+    sum_confirmed_reservation_spots,
+)
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from domain.error_codes import (
     EVENT_NO_LAYOUT_BINDING,
-    GROUP_ALREADY_RESERVED,
     INVALID_ALLOCATION,
     LEGAL_DOCUMENTS_NOT_PUBLISHED,
     NOT_FOUND,
@@ -33,6 +35,22 @@ from infrastructure.persistence.models import (
 
 DATA_POLICY = "DATA_POLICY"
 EVENT_TERMS = "EVENT_TERMS"
+
+
+def recompute_group_reservation_status(db: Session, *, group_id: UUID, event_id: UUID) -> None:
+    """Set attendee_group.reservation_status from whether any CONFIRMED reservation exists."""
+    cnt = db.execute(
+        select(func.count())
+        .select_from(Reservation)
+        .where(
+            Reservation.attendee_group_id == group_id,
+            Reservation.event_id == event_id,
+            Reservation.status == "CONFIRMED",
+        )
+    ).scalar_one()
+    grp = db.get(AttendeeGroup, group_id)
+    if grp:
+        grp.reservation_status = "CONFIRMED" if int(cnt) > 0 else "NONE"
 
 
 @dataclass
@@ -98,10 +116,6 @@ def create_reservation(
     policy_document_id: UUID,
     terms_document_id: UUID,
 ) -> Reservation:
-    grp_check = db.get(AttendeeGroup, group_id)
-    if grp_check and grp_check.reservation_status == "CONFIRMED":
-        raise ConflictError("Group already has an active reservation", code=GROUP_ALREADY_RESERVED)
-
     pay = db.get(Payment, payment_id)
     if pay is None:
         raise NotFoundError("Payment not found", code=NOT_FOUND)
@@ -112,9 +126,10 @@ def create_reservation(
 
     total_spots = sum(a.spots for a in allocations)
     sum_approved = sum_approved_tickets_for_group(db, group_id, event_id)
-    if total_spots > sum_approved:
+    active_reserved = sum_confirmed_reservation_spots(db, group_id, event_id)
+    if total_spots + active_reserved > sum_approved:
         raise ValidationError(
-            "No puedes reservar más cupos que el total de boletas aprobadas para tu grupo.",
+            "No puedes reservar más cupos que el saldo disponible (boletas aprobadas menos reservas ya confirmadas).",
             code=RESERVATION_EXCEEDS_APPROVED_TICKETS,
         )
     if total_spots < 1:
@@ -198,19 +213,32 @@ def create_reservation(
     )
     db.add(consent_row)
 
-    participants = list(
+    assigned_participant_ids = set(
+        db.execute(
+            select(ReservationCodeAssignment.participant_id)
+            .join(Reservation, ReservationCodeAssignment.reservation_id == Reservation.id)
+            .where(
+                Reservation.attendee_group_id == group_id,
+                Reservation.event_id == event_id,
+                Reservation.status == "CONFIRMED",
+            )
+        ).scalars().all()
+    )
+    participants_all = list(
         db.execute(
             select(Participant)
             .where(Participant.attendee_group_id == group_id)
             .order_by(Participant.id)
-        ).scalars()
+        ).scalars().all()
     )
-    if len(participants) < total_spots:
+    participants_for_codes = [p for p in participants_all if p.id not in assigned_participant_ids][
+        :total_spots
+    ]
+    if len(participants_for_codes) < total_spots:
         raise ValidationError(
-            "Registra al menos tantos asistentes como cupos quieres reservar.",
+            "Registra al menos tantos asistentes sin cupón asignado como cupos quieres reservar en esta operación.",
             code=PARTICIPANTS_INCOMPLETE,
         )
-    participants_for_codes = participants[:total_spots]
 
     n_codes = len(participants_for_codes)
     base_seq = _next_reservation_sequence_number(db, event_id)
@@ -230,9 +258,7 @@ def create_reservation(
     res.code_sequence_start = seq_start
     res.code_sequence_end = seq_end
 
-    grp = db.get(AttendeeGroup, group_id)
-    if grp:
-        grp.reservation_status = "CONFIRMED"
+    recompute_group_reservation_status(db, group_id=group_id, event_id=event_id)
 
     db.flush()
     # Reload server defaults (e.g. accepted_at) so the session row is not stale for response builders.
@@ -263,9 +289,7 @@ def release_reservation(db: Session, reservation_id: UUID, group_id: UUID) -> No
             t.current_occupied_spots = max(0, t.current_occupied_spots - tr.spots_reserved)
         tr.status = "RELEASED"
     res.status = "RELEASED"
-    grp = db.get(AttendeeGroup, group_id)
-    if grp:
-        grp.reservation_status = "NONE"
+    recompute_group_reservation_status(db, group_id=group_id, event_id=res.event_id)
     db.flush()
 
 

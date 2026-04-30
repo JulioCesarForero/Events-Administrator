@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from domain.error_codes import STAGE_LIMIT_EXCEEDED
 from domain.exceptions import ValidationError
-from infrastructure.persistence.models import AttendeeGroup, EventConfiguration, Payment
+from infrastructure.persistence.models import AttendeeGroup, EventConfiguration, Payment, Reservation
 
 
 def _anchor_datetime(p: Payment) -> datetime | None:
@@ -166,6 +166,18 @@ def sum_approved_tickets_for_group(db: Session, group_id: UUID, event_id: UUID) 
             Payment.attendee_group_id == group_id,
             Payment.event_id == event_id,
             Payment.status == "APPROVED",
+        )
+    ).scalar_one()
+    return int(q)
+
+
+def sum_confirmed_reservation_spots(db: Session, group_id: UUID, event_id: UUID) -> int:
+    """RN-RES-08: total spots locked in CONFIRMED reservations for this group/event."""
+    q = db.execute(
+        select(func.coalesce(func.sum(Reservation.total_spots_reserved), 0)).where(
+            Reservation.attendee_group_id == group_id,
+            Reservation.event_id == event_id,
+            Reservation.status == "CONFIRMED",
         )
     ).scalar_one()
     return int(q)

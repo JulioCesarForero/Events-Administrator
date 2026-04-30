@@ -21,6 +21,8 @@ interface MyGroup {
   displayName: string | null;
   reservationStatus: string;
   approvedTicketCount: number;
+  activeSpotsReserved?: number;
+  availableReservationBalance?: number;
   currentPaymentId?: string | null;
   latestApprovedPaymentId?: string | null;
   currentPayment?: Payment | null;
@@ -35,6 +37,7 @@ interface StepDef {
   description: string;
   status: StepStatus;
   cta?: { label: string; href: string; variant?: 'primary' | 'secondary' | 'outline' };
+  secondaryCta?: { label: string; href: string; variant?: 'primary' | 'secondary' | 'outline' };
   badge?: { label: string; tone: 'success' | 'warn' | 'error' | 'neutral' };
   hint?: string;
 }
@@ -147,9 +150,12 @@ export const PortalDashboard = () => {
     const attendeesStatus: StepStatus =
       participantCount !== null && participantCount > 0 ? 'done' : 'active';
     const payDetails = paymentStepDetails(payment, attendeesStatus === 'done');
-    const reserved = (group?.reservationStatus || 'NONE') === 'CONFIRMED';
     const approvedCnt = group?.approvedTicketCount ?? 0;
-    const mapActive = approvedCnt > 0 && !reserved;
+    const activeReserved = group?.activeSpotsReserved ?? 0;
+    const reservationBalance =
+      group?.availableReservationBalance ?? Math.max(0, approvedCnt - activeReserved);
+    const reservationFullyAllocated = approvedCnt > 0 && reservationBalance === 0;
+    const mapActive = approvedCnt > 0 && reservationBalance > 0;
     return [
       {
         key: 'attendees',
@@ -182,17 +188,38 @@ export const PortalDashboard = () => {
       {
         key: 'reservation',
         label: '3. Reserva',
-        description: 'Selecciona tu mesa cuando el pago esté aprobado.',
-        status: reserved ? 'done' : mapActive ? 'active' : 'pending',
-        badge: reserved
-          ? { label: 'Reservado', tone: 'success' }
+        description: 'Selecciona tu mesa cuando el pago esté aprobado. Puedes completar el cupo en varias visitas.',
+        status: reservationFullyAllocated ? 'done' : mapActive ? 'active' : 'pending',
+        badge: reservationFullyAllocated
+          ? { label: 'Cupos asignados', tone: 'success' }
           : mapActive
-            ? { label: 'Disponible', tone: 'success' }
+            ? activeReserved > 0
+              ? { label: 'Parcial', tone: 'warn' }
+              : { label: 'Disponible', tone: 'success' }
             : undefined,
-        cta: {
-          label: reserved ? 'Ver mi reserva' : 'Seleccionar mesa',
-          href: `/portal/${session.eventId}/map`,
-        },
+        hint:
+          approvedCnt > 0
+            ? `${activeReserved} / ${approvedCnt} en mesa · Saldo: ${reservationBalance} cupo(s) por asignar`
+            : undefined,
+        cta: reservationFullyAllocated
+          ? {
+              label: 'Ver mi reserva',
+              href: `/portal/${session.eventId}/my-reservations`,
+              variant: 'primary',
+            }
+          : {
+              label: activeReserved > 0 ? 'Continuar reserva' : 'Seleccionar mesa',
+              href: `/portal/${session.eventId}/map`,
+              variant: 'primary',
+            },
+        secondaryCta:
+          activeReserved > 0 && !reservationFullyAllocated
+            ? {
+                label: 'Ver mesas ya reservadas',
+                href: `/portal/${session.eventId}/my-reservations`,
+                variant: 'outline',
+              }
+            : undefined,
       },
     ];
   }, [session, participantCount, payment, group]);
@@ -241,9 +268,13 @@ export const PortalDashboard = () => {
             </div>
           </div>
           <div>
-            <small style={{ color: 'var(--text-secondary)' }}>Estado de la reserva</small>
+            <small style={{ color: 'var(--text-secondary)' }}>En mesa / saldo</small>
             <div style={{ fontSize: '1.1rem' }}>
-              <strong>{group?.reservationStatus || 'NONE'}</strong>
+              <strong>
+                {group?.approvedTicketCount != null && group.approvedTicketCount > 0
+                  ? `${group?.activeSpotsReserved ?? 0} / ${group.approvedTicketCount} · libre: ${group?.availableReservationBalance ?? Math.max(0, (group?.approvedTicketCount ?? 0) - (group?.activeSpotsReserved ?? 0))}`
+                  : group?.reservationStatus || 'NONE'}
+              </strong>
             </div>
           </div>
         </div>
@@ -256,6 +287,7 @@ export const PortalDashboard = () => {
           </GlassCard>
         ) : (
           steps.map((s) => {
+            const secondaryCta = s.secondaryCta;
             const Icon = s.status === 'done' ? CheckCircle2 : s.status === 'active' ? Clock : Circle;
             const iconColor =
               s.status === 'done'
@@ -301,6 +333,16 @@ export const PortalDashboard = () => {
                     {s.cta.label}
                   </Button>
                 )}
+                {secondaryCta ? (
+                  <Button
+                    variant={secondaryCta.variant || 'outline'}
+                    disabled={s.status === 'pending'}
+                    onClick={() => navigate(secondaryCta.href)}
+                    style={{ width: '100%', marginTop: '10px' }}
+                  >
+                    {secondaryCta.label}
+                  </Button>
+                ) : null}
               </GlassCard>
             );
           })

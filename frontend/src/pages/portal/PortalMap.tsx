@@ -27,6 +27,8 @@ interface MyGroup {
   groupId: string;
   eventId: string;
   approvedTicketCount: number;
+  activeSpotsReserved?: number;
+  availableReservationBalance?: number;
   reservationStatus: string;
   currentPaymentId?: string | null;
   latestApprovedPaymentId?: string | null;
@@ -115,16 +117,21 @@ export const PortalMap = () => {
     [selectedSpots],
   );
   const approved = group?.approvedTicketCount ?? 0;
+  const activeReserved = group?.activeSpotsReserved ?? 0;
+  const availableBalance = useMemo(() => {
+    if (group?.availableReservationBalance != null) return Math.max(0, group.availableReservationBalance);
+    return Math.max(0, approved - activeReserved);
+  }, [group?.availableReservationBalance, approved, activeReserved]);
   const reservationPaymentId =
     group?.latestApprovedPaymentId || group?.currentPaymentId || null;
   const canConfirm =
     totalAssigned > 0 &&
-    totalAssigned === approved &&
-    approved > 0 &&
+    totalAssigned <= availableBalance &&
+    availableBalance > 0 &&
     !!reservationPaymentId;
 
   const setSpots = (tid: string, next: number, maxAvailable: number) => {
-    const remainingBudget = approved - totalAssigned + (selectedSpots[tid] || 0);
+    const remainingBudget = availableBalance - totalAssigned + (selectedSpots[tid] || 0);
     const clamped = Math.max(0, Math.min(next, maxAvailable, remainingBudget));
     setSelectedSpots((prev) => {
       const copy = { ...prev };
@@ -186,14 +193,42 @@ export const PortalMap = () => {
 
   return (
     <div className="animate-slide-up" style={{ maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate(`/portal/${session.eventId}/dashboard`)}
-          style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
-        >
-          <ArrowLeft size={24} />
-        </button>
-        <h2 style={{ margin: 0 }}>Selección de Mesa</h2>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          marginBottom: '24px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button
+            onClick={() => navigate(`/portal/${session.eventId}/dashboard`)}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}
+          >
+            <ArrowLeft size={24} />
+          </button>
+          <h2 style={{ margin: 0 }}>Selección de Mesa</h2>
+        </div>
+        {activeReserved > 0 && (
+          <button
+            type="button"
+            onClick={() => navigate(`/portal/${session.eventId}/my-reservations`)}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border-focus)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-md)',
+            }}
+          >
+            Ver mis mesas
+          </button>
+        )}
       </div>
 
       {loadError && (
@@ -220,7 +255,12 @@ export const PortalMap = () => {
         <GlassCard style={{ minHeight: '500px', position: 'relative', overflow: 'hidden' }}>
           <h3 style={{ marginBottom: '12px' }}>Layout del Salón</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 0 16px' }}>
-            Toca una mesa para asignarle cupos. El total debe coincidir con tus {approved} boletas aprobadas.
+            Toca una mesa para asignarle cupos. Puedes reservar hasta {availableBalance} cupo(s) en esta operación
+            {activeReserved > 0
+              ? ` (${activeReserved} ya reservado(s) de ${approved} boletas aprobadas).`
+              : approved > 0
+                ? ` (${approved} boleta(s) aprobada(s) en total).`
+                : '.'}
           </p>
 
           <div
@@ -246,7 +286,7 @@ export const PortalMap = () => {
                   // If they click on it, and it's not selected, we select +1. If selected > 0, maybe they want to add more?
                   // To keep UI simple, let's keep the +/- buttons in the list. On Map click, if 0, assign 1 if possible.
                   const currentSelected = selectedSpots[tid] || 0;
-                  if (currentSelected === 0 && avail > 0 && totalAssigned < approved) {
+                  if (currentSelected === 0 && avail > 0 && totalAssigned < availableBalance) {
                     setSpots(tid, 1, avail);
                   }
                 }}
@@ -263,7 +303,12 @@ export const PortalMap = () => {
           <GlassCard>
             <h3 style={{ marginBottom: '8px' }}>Tu Selección</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-              Total asignado: <strong>{totalAssigned}</strong> / {approved}
+              Total esta reserva: <strong>{totalAssigned}</strong> / {availableBalance}
+              {approved > 0 ? (
+                <span style={{ display: 'block', marginTop: '4px', fontSize: '0.8rem' }}>
+                  Aprobadas: {approved} · Ya en mesa: {activeReserved}
+                </span>
+              ) : null}
             </p>
 
             {Object.keys(selectedSpots).length === 0 ? (
@@ -301,13 +346,13 @@ export const PortalMap = () => {
                          <strong style={{ minWidth: '18px', textAlign: 'center' }}>{spots}</strong>
                          <button
                             onClick={() => setSpots(tid, spots + 1, avail)}
-                            disabled={avail <= 0 || totalAssigned >= approved}
+                            disabled={avail <= 0 || totalAssigned >= availableBalance}
                             style={{
                               border: 'none',
-                              background: avail > 0 && totalAssigned < approved ? 'var(--accent-primary)' : 'var(--border-light)',
+                              background: avail > 0 && totalAssigned < availableBalance ? 'var(--accent-primary)' : 'var(--border-light)',
                               color: '#000',
                               width: 26, height: 26, borderRadius: '50%',
-                              cursor: avail > 0 && totalAssigned < approved ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                              cursor: avail > 0 && totalAssigned < availableBalance ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center'
                             }}
                           ><Plus size={14}/></button>
                       </div>
@@ -320,6 +365,12 @@ export const PortalMap = () => {
             {!reservationPaymentId && (
               <p style={{ color: 'var(--error)', fontSize: '0.85rem', marginTop: '12px' }}>
                 Necesitas al menos una boleta aprobada antes de reservar.
+              </p>
+            )}
+            {reservationPaymentId && approved > 0 && availableBalance === 0 && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '12px' }}>
+                Ya reservaste todos los cupos permitidos por tus boletas aprobadas. Si necesitas cambiar mesa, libera una
+                reserva previa o contacta al comité.
               </p>
             )}
             {(!policyDoc || !termsDoc) && (
