@@ -97,6 +97,11 @@ export interface MyGroup {
   displayName: string | null;
   reservationStatus: ReservationStatus;
   approvedTicketCount: number;
+  currentPaymentId?: string | null;
+  /** Latest APPROVED payment id — use for reservation POST when tickets span several pagos. */
+  latestApprovedPaymentId?: string | null;
+  /** Máximo de asistentes registrables en la etapa comercial actual (preventa / venta general). */
+  maxParticipantsAllowed?: number;
 }
 
 /* =========================================================================

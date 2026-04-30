@@ -2,6 +2,8 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError as PydanticValidationError
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.health import router as health_router
@@ -15,6 +17,7 @@ from domain.error_codes import (
     FORBIDDEN,
     INVALID_PAYLOAD,
     NOT_FOUND,
+    TABLE_CAPACITY_CONFLICT,
     UNAUTHENTICATED,
 )
 from domain.exceptions import DomainError
@@ -142,6 +145,43 @@ def create_app() -> FastAPI:
             for e in errors
         ]
         return JSONResponse(status_code=422, content=body)
+
+    @app.exception_handler(PydanticValidationError)
+    async def _pydantic_model_handler(
+        request: Request, exc: PydanticValidationError
+    ) -> JSONResponse:
+        """Outbound response models (e.g. reservation confirmation) must not become opaque 500s."""
+        rid = getattr(request.state, "request_id", None)
+        errs = exc.errors()
+        first = errs[0] if errs else {}
+        loc = ".".join(str(x) for x in first.get("loc", ()))
+        msg = first.get("msg", "Validation error")
+        detail = f"{loc}: {msg}" if loc else msg
+        body = problem_response(
+            status=422,
+            title=INVALID_PAYLOAD,
+            detail=detail,
+            code=INVALID_PAYLOAD,
+            correlation_id=rid,
+        )
+        body["errors"] = errs
+        return JSONResponse(status_code=422, content=body)
+
+    @app.exception_handler(IntegrityError)
+    async def _integrity_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+        rid = getattr(request.state, "request_id", None)
+        orig_msg = str(exc.orig).strip() if exc.orig else str(exc).strip()
+        body = problem_response(
+            status=409,
+            title=TABLE_CAPACITY_CONFLICT,
+            detail="La operación chocó con datos ya existentes (p. ej. cupo o código duplicado). "
+            "Reintenta o actualiza el mapa.",
+            code=TABLE_CAPACITY_CONFLICT,
+            correlation_id=rid,
+        )
+        if orig_msg:
+            body["hint"] = orig_msg[:500]
+        return JSONResponse(status_code=409, content=body)
 
     app.include_router(health_router)
 

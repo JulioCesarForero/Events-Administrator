@@ -22,6 +22,7 @@ interface MyGroup {
   reservationStatus: string;
   approvedTicketCount: number;
   currentPaymentId?: string | null;
+  latestApprovedPaymentId?: string | null;
   currentPayment?: Payment | null;
   eventDate?: string | null;
 }
@@ -147,7 +148,8 @@ export const PortalDashboard = () => {
       participantCount !== null && participantCount > 0 ? 'done' : 'active';
     const payDetails = paymentStepDetails(payment, attendeesStatus === 'done');
     const reserved = (group?.reservationStatus || 'NONE') === 'CONFIRMED';
-    const mapActive = payDetails.status === 'done' && !reserved;
+    const approvedCnt = group?.approvedTicketCount ?? 0;
+    const mapActive = approvedCnt > 0 && !reserved;
     return [
       {
         key: 'attendees',

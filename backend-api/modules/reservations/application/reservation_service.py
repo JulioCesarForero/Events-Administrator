@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from modules.payments.application.stage_capacity import sum_approved_tickets_for_group
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,6 +12,7 @@ from domain.error_codes import (
     INVALID_ALLOCATION,
     LEGAL_DOCUMENTS_NOT_PUBLISHED,
     NOT_FOUND,
+    PARTICIPANTS_INCOMPLETE,
     PAYMENT_NOT_APPROVED,
     RESERVATION_EXCEEDS_APPROVED_TICKETS,
     TABLE_CAPACITY_CONFLICT,
@@ -69,6 +71,23 @@ def _next_reservation_sequence_number(db: Session, event_id: UUID) -> int:
         return int(seq)
 
 
+def reservation_code_block(
+    base_seq: int, count: int
+) -> tuple[list[tuple[int, str]], int, int]:
+    """Build per-row (code_sequence_number, reservation_code) from one DB-allocated base.
+
+    ``_next_reservation_sequence_number`` must be called **once** per reservation
+    before flush: re-querying MAX(...) per row in the same transaction yields the
+    same next value for every row and violates ``uq_rca_event_reservation_code``.
+    """
+    if count < 0:
+        raise ValueError("count must be non-negative")
+    pairs = [(base_seq + i, f"R{base_seq + i:06d}"[:32]) for i in range(count)]
+    if count == 0:
+        return pairs, base_seq, base_seq
+    return pairs, base_seq, base_seq + count - 1
+
+
 def create_reservation(
     db: Session,
     *,
@@ -92,11 +111,14 @@ def create_reservation(
         raise ValidationError("Payment must be approved before reserving", code=PAYMENT_NOT_APPROVED)
 
     total_spots = sum(a.spots for a in allocations)
-    if total_spots != pay.ticket_quantity:
+    sum_approved = sum_approved_tickets_for_group(db, group_id, event_id)
+    if total_spots > sum_approved:
         raise ValidationError(
-            "Total spots must match approved ticket quantity",
+            "No puedes reservar más cupos que el total de boletas aprobadas para tu grupo.",
             code=RESERVATION_EXCEEDS_APPROVED_TICKETS,
         )
+    if total_spots < 1:
+        raise ValidationError("Debes reservar al menos un cupo", code=INVALID_ALLOCATION)
 
     pol = db.get(EventPolicyDocument, policy_document_id)
     terms = db.get(EventPolicyDocument, terms_document_id)
@@ -164,35 +186,37 @@ def create_reservation(
         )
         t.current_occupied_spots += a.spots
 
-    db.add(
-        ReservationConsent(
-            event_id=event_id,
-            reservation_id=res.id,
-            attendee_group_id=group_id,
-            policy_document_id=policy_document_id,
-            terms_document_id=terms_document_id,
-            accepted_by_actor_type="BUYER",
-            policy_version_label=pol.version_label,
-            terms_version_label=terms.version_label,
-        )
+    consent_row = ReservationConsent(
+        event_id=event_id,
+        reservation_id=res.id,
+        attendee_group_id=group_id,
+        policy_document_id=policy_document_id,
+        terms_document_id=terms_document_id,
+        accepted_by_actor_type="BUYER",
+        policy_version_label=pol.version_label,
+        terms_version_label=terms.version_label,
     )
+    db.add(consent_row)
 
     participants = list(
         db.execute(
-            select(Participant).where(Participant.attendee_group_id == group_id)
+            select(Participant)
+            .where(Participant.attendee_group_id == group_id)
+            .order_by(Participant.id)
         ).scalars()
     )
-    if len(participants) != pay.ticket_quantity:
-        raise ValidationError("Number of participants must match ticket quantity")
+    if len(participants) < total_spots:
+        raise ValidationError(
+            "Registra al menos tantos asistentes como cupos quieres reservar.",
+            code=PARTICIPANTS_INCOMPLETE,
+        )
+    participants_for_codes = participants[:total_spots]
 
-    seq_start: int | None = None
-    seq_end: int | None = None
-    for p in participants:
-        seq = _next_reservation_sequence_number(db, event_id)
-        if seq_start is None:
-            seq_start = seq
-        seq_end = seq
-        code = f"R{seq:06d}"[:32]
+    n_codes = len(participants_for_codes)
+    base_seq = _next_reservation_sequence_number(db, event_id)
+    code_rows, seq_start, seq_end = reservation_code_block(base_seq, n_codes)
+
+    for p, (seq, code) in zip(participants_for_codes, code_rows, strict=True):
         db.add(
             ReservationCodeAssignment(
                 event_id=event_id,
@@ -211,6 +235,8 @@ def create_reservation(
         grp.reservation_status = "CONFIRMED"
 
     db.flush()
+    # Reload server defaults (e.g. accepted_at) so the session row is not stale for response builders.
+    db.refresh(consent_row)
     return res
 
 

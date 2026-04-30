@@ -29,6 +29,7 @@ interface MyGroup {
   approvedTicketCount: number;
   reservationStatus: string;
   currentPaymentId?: string | null;
+  latestApprovedPaymentId?: string | null;
 }
 
 type ReservedCode = { participantId: string; code: string };
@@ -114,8 +115,13 @@ export const PortalMap = () => {
     [selectedSpots],
   );
   const approved = group?.approvedTicketCount ?? 0;
+  const reservationPaymentId =
+    group?.latestApprovedPaymentId || group?.currentPaymentId || null;
   const canConfirm =
-    totalAssigned > 0 && totalAssigned === approved && !!group?.currentPaymentId;
+    totalAssigned > 0 &&
+    totalAssigned === approved &&
+    approved > 0 &&
+    !!reservationPaymentId;
 
   const setSpots = (tid: string, next: number, maxAvailable: number) => {
     const remainingBudget = approved - totalAssigned + (selectedSpots[tid] || 0);
@@ -129,9 +135,9 @@ export const PortalMap = () => {
   };
 
   const confirmReservation = async () => {
-    if (!session || !group?.currentPaymentId || !policyDoc || !termsDoc) {
+    if (!session || !reservationPaymentId || !policyDoc || !termsDoc) {
       setSubmitError(
-        'Faltan datos para reservar: pago aprobado, política o términos del evento.',
+        'Faltan datos para reservar: al menos una boleta aprobada, política y términos del evento.',
       );
       return;
     }
@@ -147,7 +153,7 @@ export const PortalMap = () => {
         `/events/${session.eventId}/reservations`,
         {
           groupId: session.groupId,
-          paymentId: group.currentPaymentId,
+          paymentId: reservationPaymentId,
           legalAcceptance: {
             accepted: true,
             policyDocumentId: policyDoc.id,
@@ -311,9 +317,9 @@ export const PortalMap = () => {
               </ul>
             )}
 
-            {!group?.currentPaymentId && (
+            {!reservationPaymentId && (
               <p style={{ color: 'var(--error)', fontSize: '0.85rem', marginTop: '12px' }}>
-                Necesitas un pago aprobado antes de reservar.
+                Necesitas al menos una boleta aprobada antes de reservar.
               </p>
             )}
             {(!policyDoc || !termsDoc) && (

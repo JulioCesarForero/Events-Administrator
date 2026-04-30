@@ -4,7 +4,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { apiClient } from '../../api/client';
+import { apiClient, type ApiError } from '../../api/client';
 import { UserPlus, Trash2, ArrowLeft, CalendarClock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,6 +22,7 @@ interface MyGroup {
   eventDate?: string | null;
   timezone?: string | null;
   approvedTicketCount: number;
+  maxParticipantsAllowed?: number;
 }
 
 const EDIT_WINDOW_DAYS = 20;
@@ -89,9 +90,22 @@ export const PortalAttendees = () => {
   const days = useMemo(() => daysUntil(group?.eventDate), [group?.eventDate]);
   const editWindowClosed = typeof days === 'number' && days <= EDIT_WINDOW_DAYS;
 
+  const attendeeLimit = group?.maxParticipantsAllowed ?? 4;
+  const atAttendeeLimit = attendees.length >= attendeeLimit;
+
+  const limitReachedMessage = useMemo(
+    () =>
+      `Has superado el límite máximo de cupo de acompañantes permitido para esta etapa del evento (${attendeeLimit}).`,
+    [attendeeLimit],
+  );
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    if (atAttendeeLimit) {
+      setFormError(limitReachedMessage);
+      return;
+    }
     setLoading(true);
     try {
       const { hasAllergies, ...payload } = formData;
@@ -104,10 +118,13 @@ export const PortalAttendees = () => {
       setFormData({ ...formData, firstName: '', lastName: '', documentId: '', mobilePhone: '' });
       loadData();
     } catch (err: unknown) {
+      const apiErr = err as ApiError;
       const msg =
-        err instanceof Error
-          ? err.message
-          : 'Error guardando participante';
+        apiErr?.code === 'PARTICIPANT_LIMIT_EXCEEDED'
+          ? limitReachedMessage
+          : err instanceof Error
+            ? err.message
+            : 'Error guardando participante';
       setFormError(msg);
     } finally {
       setLoading(false);
@@ -166,6 +183,18 @@ export const PortalAttendees = () => {
         <h2 style={{ margin: 0 }}>Gestión de Asistentes</h2>
       </div>
 
+      <GlassCard style={{ marginBottom: '16px', padding: '14px 18px' }}>
+        <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+          Asistentes registrados: <strong>{attendees.length}</strong> / {attendeeLimit} (máximo permitido
+          en la etapa actual del evento).
+        </p>
+        {atAttendeeLimit && (
+          <p style={{ margin: '10px 0 0', fontSize: '0.85rem', color: 'var(--error)' }}>
+            {limitReachedMessage}
+          </p>
+        )}
+      </GlassCard>
+
       {editWindowClosed && (
         <GlassCard
           style={{
@@ -223,9 +252,13 @@ export const PortalAttendees = () => {
 
           <Button
             icon={UserPlus}
-            onClick={() => setShowForm(true)}
-            disabled={editWindowClosed}
+            onClick={() => {
+              if (atAttendeeLimit) return;
+              setShowForm(true);
+            }}
+            disabled={editWindowClosed || atAttendeeLimit}
             style={{ marginTop: '16px' }}
+            title={atAttendeeLimit ? limitReachedMessage : undefined}
           >
             Añadir Asistente
           </Button>

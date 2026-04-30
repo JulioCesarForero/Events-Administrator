@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -70,7 +70,7 @@ class ReservationCreateIn(CamelModel):
             )
         if not self.legal_acceptance.accepted:
             raise DomainValidationError(
-                "Legal acceptance is required before creating a reservation",
+                "Debes aceptar la política de datos y los términos y condiciones para crear la reserva.",
                 code=LEGAL_ACCEPTANCE_REQUIRED,
             )
         return self
@@ -130,7 +130,7 @@ class MoveBody(CamelModel):
 def _serialize_reservation(res_out: ReservationOut) -> dict:
     """Emit both the canonical `reservationId` and the legacy `id` key so
     existing clients continue to parse the old shape."""
-    data = res_out.model_dump(by_alias=True, exclude_none=True)
+    data = res_out.model_dump(mode="json", by_alias=True, exclude_none=True)
     if "reservationId" in data:
         data["id"] = data["reservationId"]
     # Emit legacy `reservationCode` alongside the canonical `code` for codes.
@@ -164,20 +164,23 @@ def _build_reservation_out(
 
     if consent is None:
         legal_out: LegalAcceptanceOut | LegalAcceptanceDetailedOut | None = None
-    elif detailed_legal:
-        legal_out = LegalAcceptanceDetailedOut(
-            policy_document_id=consent.policy_document_id,
-            terms_document_id=consent.terms_document_id,
-            policy_version_label=consent.policy_version_label,
-            terms_version_label=consent.terms_version_label,
-            accepted_at=consent.accepted_at,
-        )
     else:
-        legal_out = LegalAcceptanceOut(
-            policy_version_label=consent.policy_version_label,
-            terms_version_label=consent.terms_version_label,
-            accepted_at=consent.accepted_at,
-        )
+        # server_default timestamps are not always populated on the ORM instance until refresh.
+        accepted_at = consent.accepted_at or datetime.now(UTC)
+        if detailed_legal:
+            legal_out = LegalAcceptanceDetailedOut(
+                policy_document_id=consent.policy_document_id,
+                terms_document_id=consent.terms_document_id,
+                policy_version_label=consent.policy_version_label,
+                terms_version_label=consent.terms_version_label,
+                accepted_at=accepted_at,
+            )
+        else:
+            legal_out = LegalAcceptanceOut(
+                policy_version_label=consent.policy_version_label,
+                terms_version_label=consent.terms_version_label,
+                accepted_at=accepted_at,
+            )
 
     return ReservationOut(
         reservation_id=res.id,

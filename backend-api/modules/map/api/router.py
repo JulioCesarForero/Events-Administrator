@@ -3,7 +3,7 @@ from uuid import UUID
 import jwt
 from fastapi import APIRouter, HTTPException, Request
 from shared.api.schemas import CamelModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from config.settings import settings
 from infrastructure.persistence.models import (
@@ -110,24 +110,6 @@ def _map_tables(db, layout_id: UUID) -> list[MapTableOut]:
     return out
 
 
-def _resolve_effective_approved_payment(db, group: AttendeeGroup) -> Payment | None:
-    pay = db.get(Payment, group.current_payment_id) if group.current_payment_id else None
-    if pay is not None and pay.status == "APPROVED":
-        return pay
-    return (
-        db.execute(
-            select(Payment)
-            .where(
-                Payment.attendee_group_id == group.id,
-                Payment.event_id == group.event_id,
-                Payment.status == "APPROVED",
-            )
-            .order_by(Payment.approved_at.desc())
-            .limit(1)
-        ).scalar_one_or_none()
-    )
-
-
 def _resolve_background_url(raw_url: str | None) -> str | None:
     if not raw_url:
         return None
@@ -187,9 +169,19 @@ def get_event_map(event_id: UUID, request: Request, db: DbSession) -> MapEnvelop
         if policy == "AFTER_PAYMENT_APPROVED":
             from domain.error_codes import PAYMENT_NOT_APPROVED
             from domain.exceptions import ValidationError as DomainValidation
-            pay = _resolve_effective_approved_payment(db, g)
-            if pay is None:
-                raise DomainValidation("Map not visible until payment is approved", code=PAYMENT_NOT_APPROVED)
+
+            approved_sum = db.execute(
+                select(func.coalesce(func.sum(Payment.ticket_quantity), 0)).where(
+                    Payment.attendee_group_id == g.id,
+                    Payment.event_id == event_id,
+                    Payment.status == "APPROVED",
+                )
+            ).scalar_one()
+            if int(approved_sum) < 1:
+                raise DomainValidation(
+                    "El mapa no está disponible hasta que el comité apruebe al menos una boleta.",
+                    code=PAYMENT_NOT_APPROVED,
+                )
         layout_id = _latest_binding(db, event_id).layout_id
 
     layout = db.get(Layout, layout_id)

@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import Field
 
 from shared.api.schemas import CamelModel, CamelOrmModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from infrastructure.persistence.models import (
@@ -17,6 +17,13 @@ from infrastructure.persistence.models import (
     StaffUser,
 )
 from modules.attendees.domain.rules import ensure_participant_editable_window
+from domain.error_codes import PARTICIPANT_LIMIT_EXCEEDED
+from domain.exceptions import ValidationError
+from modules.payments.application.stage_capacity import (
+    current_max_participants_per_group,
+    latest_approved_payment_id,
+    sum_approved_tickets_for_group,
+)
 from shared.api.deps import (
     BuyerClaimsDep,
     DbSession,
@@ -83,11 +90,13 @@ class MyGroupOut(CamelOrmModel):
     reservation_status: str
     approved_ticket_count: int
     current_payment_id: UUID | None = None
+    latest_approved_payment_id: UUID | None = None
     current_payment: MyGroupPaymentOut | None = None
     event_date: datetime | None = None
     timezone: str | None = None
     ticket_price: int = 50000
     payment_instructions: str | None = None
+    max_participants_allowed: int = 4
 
 
 @router.get("/portal/events/{event_id}/my-group", response_model=MyGroupOut)
@@ -101,7 +110,10 @@ def get_my_group(
     cfg = db.execute(
         select(EventConfiguration).where(EventConfiguration.event_id == event_id)
     ).scalar_one_or_none()
-    pay = _effective_group_payment(db, g)
+    wf: Payment | None = (
+        db.get(Payment, g.current_payment_id) if g.current_payment_id else None
+    )
+    pay = wf if wf is not None else _effective_group_payment(db, g)
     payment_out = None
     if pay is not None:
         payment_out = MyGroupPaymentOut(
@@ -114,19 +126,24 @@ def get_my_group(
             approved_at=pay.approved_at,
             rejected_at=pay.rejected_at,
         )
+    approved_sum = sum_approved_tickets_for_group(db, g.id, event_id)
+    last_appr = latest_approved_payment_id(db, g.id, event_id)
+    max_participants = current_max_participants_per_group(cfg) if cfg is not None else 4
     return MyGroupOut(
         group_id=g.id,
         event_id=g.event_id,
         student_code_snapshot=g.student_code_snapshot,
         display_name=g.display_name,
         reservation_status=g.reservation_status,
-        approved_ticket_count=pay.ticket_quantity if pay is not None else g.approved_ticket_count,
-        current_payment_id=pay.id if pay is not None else g.current_payment_id,
+        approved_ticket_count=approved_sum,
+        current_payment_id=g.current_payment_id,
+        latest_approved_payment_id=last_appr,
         current_payment=payment_out,
         event_date=ev.event_date if ev else None,
         timezone=cfg.timezone if cfg else None,
         ticket_price=cfg.ticket_price if cfg else 50000,
         payment_instructions=cfg.payment_instructions if cfg else None,
+        max_participants_allowed=max_participants,
     )
 
 
@@ -246,6 +263,22 @@ def create_participant(
     ev = _load_event_for_group(db, g)
     tz = _event_timezone(db, ev.id)
     ensure_participant_editable_window(ev.event_date, timezone=tz)
+    cfg = db.execute(
+        select(EventConfiguration).where(EventConfiguration.event_id == g.event_id)
+    ).scalar_one_or_none()
+    if cfg is not None:
+        cap = current_max_participants_per_group(cfg)
+        existing = db.execute(
+            select(func.count())
+            .select_from(Participant)
+            .where(Participant.attendee_group_id == group_id)
+        ).scalar_one()
+        if int(existing) >= cap:
+            raise ValidationError(
+                f"No puedes registrar más de {cap} asistentes: has alcanzado el cupo máximo "
+                "permitido para esta etapa del evento.",
+                code=PARTICIPANT_LIMIT_EXCEEDED,
+            )
     p = Participant(attendee_group_id=group_id, **body.model_dump())
     db.add(p)
     db.flush()

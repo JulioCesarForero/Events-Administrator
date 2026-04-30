@@ -9,6 +9,7 @@ from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import or_, select
 
 from domain.error_codes import (
+    INVALID_PAYLOAD,
     MISSING_PAYMENT_EVIDENCE,
     PARTICIPANTS_INCOMPLETE,
     PAYMENT_ALREADY_REVIEWED,
@@ -33,6 +34,11 @@ from shared.api.deps import (
     buyer_event_id,
     buyer_group_id,
     ensure_event_staff_access,
+)
+from modules.payments.application.stage_capacity import (
+    assert_approval_fits_bucket,
+    assert_stage_ticket_capacity,
+    refresh_group_approved_ticket_count,
 )
 
 router = APIRouter(tags=["payments"])
@@ -86,28 +92,6 @@ class PaymentInboxOut(PaymentOut):
     display_name: str | None = None
 
 
-def _check_stage_limit(db, event_id: UUID, requested_tickets: int) -> None:
-    """Enforce RN-TIME-02/03: presale max 4, general max 3 tickets per group."""
-    cfg = db.execute(
-        select(EventConfiguration).where(EventConfiguration.event_id == event_id)
-    ).scalar_one_or_none()
-    if cfg is None:
-        return
-    now = datetime.now(UTC)
-    if cfg.presale_start_date <= now <= cfg.presale_end_date:
-        if requested_tickets > cfg.max_presale_tickets:
-            raise ValidationError(
-                f"Presale allows at most {cfg.max_presale_tickets} tickets",
-                code=STAGE_LIMIT_EXCEEDED,
-            )
-    elif cfg.sale_start_date <= now <= cfg.sale_end_date:
-        if requested_tickets > cfg.max_sale_tickets:
-            raise ValidationError(
-                f"General sale allows at most {cfg.max_sale_tickets} tickets",
-                code=STAGE_LIMIT_EXCEEDED,
-            )
-
-
 @router.post("/groups/{group_id}/payments", response_model=PaymentOut)
 def create_payment(
     group_id: UUID,
@@ -116,7 +100,12 @@ def create_payment(
     claims: BuyerClaimsDep,
 ) -> Payment:
     g = _buyer_group(db, claims, group_id)
-    _check_stage_limit(db, g.event_id, body.ticket_quantity)
+    assert_stage_ticket_capacity(
+        db,
+        event_id=g.event_id,
+        group_id=group_id,
+        requested=body.ticket_quantity,
+    )
     pay = Payment(
         event_id=g.event_id,
         attendee_group_id=group_id,
@@ -157,7 +146,13 @@ def patch_payment(
     # RN-TIME-02/03 so the buyer cannot bypass presale/sale caps via PATCH.
     new_qty = patch_data.get("ticket_quantity")
     if new_qty is not None and new_qty != p.ticket_quantity:
-        _check_stage_limit(db, p.event_id, new_qty)
+        assert_stage_ticket_capacity(
+            db,
+            event_id=p.event_id,
+            group_id=p.attendee_group_id,
+            requested=new_qty,
+            exclude_payment_id=p.id,
+        )
 
     if p.status == "REJECTED":
         # Keep rejection_reason / rejected_at until the buyer resubmits so the portal
@@ -249,6 +244,13 @@ def submit_payment(
             code=PARTICIPANTS_INCOMPLETE,
         )
 
+    assert_stage_ticket_capacity(
+        db,
+        event_id=g.event_id,
+        group_id=g.id,
+        requested=p.ticket_quantity,
+    )
+
     if p.payment_type in ("DIGITAL", "CASH"):
         evidence = db.execute(
             select(PaymentEvidence).where(PaymentEvidence.payment_id == payment_id)
@@ -333,6 +335,16 @@ def approve_payment(
         raise ConflictError("Payment is not pending approval", code=PAYMENT_ALREADY_REVIEWED)
     original_qty = p.ticket_quantity
     approved_count = (body.approved_ticket_count if body and body.approved_ticket_count else p.ticket_quantity)
+    if approved_count < 1 or approved_count > original_qty:
+        raise ValidationError(
+            "La cantidad aprobada debe ser entre 1 y la cantidad solicitada en el pago.",
+            code=INVALID_PAYLOAD,
+        )
+    cfg = db.execute(
+        select(EventConfiguration).where(EventConfiguration.event_id == p.event_id)
+    ).scalar_one_or_none()
+    if cfg is not None:
+        assert_approval_fits_bucket(db, payment=p, cfg=cfg, approved_count=approved_count)
     p.status = "APPROVED"
     p.ticket_quantity = approved_count
     # Keep displayed amount consistent when staff adjusts approved tickets.
@@ -348,7 +360,7 @@ def approve_payment(
     p.reviewed_by_user_id = staff.id
     g = db.get(AttendeeGroup, p.attendee_group_id)
     if g:
-        g.approved_ticket_count = approved_count
+        refresh_group_approved_ticket_count(db, g.id)
     ev = db.get(Event, p.event_id)
     append_audit_log(
         db,
@@ -408,6 +420,12 @@ def create_cash_payment(
     g = db.get(AttendeeGroup, body.attendee_group_id)
     if g is None or g.event_id != event_id:
         raise HTTPException(status_code=400, detail="Invalid group for event")
+    assert_stage_ticket_capacity(
+        db,
+        event_id=event_id,
+        group_id=body.attendee_group_id,
+        requested=body.ticket_quantity,
+    )
     if not body.receipt_file_url:
         raise ValidationError(
             "Cash payment requires receipt evidence",
