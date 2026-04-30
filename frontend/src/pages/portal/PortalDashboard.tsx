@@ -172,15 +172,8 @@ export const PortalDashboard = () => {
         badge: payDetails.badge,
         hint: payDetails.hint,
         cta: {
-          label: !payment
-            ? 'Registrar pago'
-            : payment.status === 'DRAFT'
-              ? 'Continuar registro'
-              : 'Ver estado',
-          href:
-            !payment || payment.status === 'DRAFT'
-              ? `/portal/${session.eventId}/payment`
-              : `/portal/${session.eventId}/payment-status`,
+          label: 'Mis pagos',
+          href: `/portal/${session.eventId}/payment-status`,
           variant: 'secondary',
         },
       },

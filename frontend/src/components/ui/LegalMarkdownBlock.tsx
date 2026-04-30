@@ -5,6 +5,8 @@ type LegalMarkdownBlockProps = {
   content: string | undefined;
   /** Shown when content is empty or only whitespace. */
   emptyLabel?: string;
+  /** Extra class on the wrapper (e.g. layout variants). */
+  className?: string;
 };
 
 /**
@@ -13,14 +15,16 @@ type LegalMarkdownBlockProps = {
 export function LegalMarkdownBlock({
   content,
   emptyLabel = '(sin contenido)',
+  className,
 }: LegalMarkdownBlockProps) {
   const text = content?.trim() ?? '';
+  const rootClass = ['legal-md-block', className].filter(Boolean).join(' ');
   if (!text) {
-    return <p className="legal-md-block legal-md-block--empty">{emptyLabel}</p>;
+    return <p className={`${rootClass} legal-md-block--empty`.trim()}>{emptyLabel}</p>;
   }
 
   return (
-    <div className="legal-md-block">
+    <div className={rootClass}>
       <ReactMarkdown>{text}</ReactMarkdown>
     </div>
   );

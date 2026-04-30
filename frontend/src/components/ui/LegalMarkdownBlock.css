@@ -10,6 +10,12 @@
   color: var(--text-primary);
 }
 
+/* Long-form copy (e.g. bank instructions): show full height without clipping. */
+.legal-md-block.legal-md-block--payment-instructions {
+  max-height: none;
+  overflow-y: visible;
+}
+
 .legal-md-block h1,
 .legal-md-block h2,
 .legal-md-block h3,

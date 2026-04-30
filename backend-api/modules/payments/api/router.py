@@ -26,7 +26,14 @@ from infrastructure.persistence.models import (
     Payment,
     PaymentEvidence,
 )
-from shared.api.deps import BuyerClaimsDep, DbSession, StaffUserDep, buyer_group_id, ensure_event_staff_access
+from shared.api.deps import (
+    BuyerClaimsDep,
+    DbSession,
+    StaffUserDep,
+    buyer_event_id,
+    buyer_group_id,
+    ensure_event_staff_access,
+)
 
 router = APIRouter(tags=["payments"])
 
@@ -56,6 +63,7 @@ class PaymentOut(CamelOrmModel):
     payment_type: str
     amount_cents: int | None = None
     currency: str | None = None
+    created_at: datetime | None = None
     submitted_at: datetime | None = None
     approved_at: datetime | None = None
     rejected_at: datetime | None = None
@@ -152,12 +160,69 @@ def patch_payment(
         _check_stage_limit(db, p.event_id, new_qty)
 
     if p.status == "REJECTED":
+        # Keep rejection_reason / rejected_at until the buyer resubmits so the portal
+        # can still show the committee note while correcting evidence in DRAFT.
         p.status = "DRAFT"
-        p.rejected_at = None
-        p.rejection_reason = None
-        p.reviewed_by_user_id = None
     for k, v in patch_data.items():
         setattr(p, k, v)
+    db.flush()
+    return p
+
+
+@router.get("/portal/events/{event_id}/my-payments", response_model=list[PaymentOut])
+def list_my_payments(
+    event_id: UUID,
+    db: DbSession,
+    claims: BuyerClaimsDep,
+) -> list[Payment]:
+    if buyer_event_id(claims) != event_id:
+        raise HTTPException(status_code=403, detail="Token not valid for this event")
+    gid = buyer_group_id(claims)
+    return list(
+        db.execute(
+            select(Payment)
+            .where(
+                Payment.event_id == event_id,
+                Payment.attendee_group_id == gid,
+            )
+            .order_by(Payment.created_at.desc())
+        ).scalars()
+    )
+
+
+@router.get("/portal/payments/{payment_id}", response_model=PaymentOut)
+def get_buyer_payment(
+    payment_id: UUID,
+    db: DbSession,
+    claims: BuyerClaimsDep,
+) -> Payment:
+    p = db.get(Payment, payment_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    _buyer_group(db, claims, p.attendee_group_id)
+    if buyer_event_id(claims) != p.event_id:
+        raise HTTPException(status_code=403, detail="Token not valid for this event")
+    return p
+
+
+@router.post("/payments/{payment_id}/withdraw", response_model=PaymentOut)
+def withdraw_payment_for_correction(
+    payment_id: UUID,
+    db: DbSession,
+    claims: BuyerClaimsDep,
+) -> Payment:
+    """Return a PENDING_APPROVAL payment to DRAFT so the buyer can replace evidence."""
+    p = db.get(Payment, payment_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    _buyer_group(db, claims, p.attendee_group_id)
+    if p.status != "PENDING_APPROVAL":
+        raise ConflictError(
+            "Only payments pending review can be withdrawn for correction",
+            code=PAYMENT_INVALID_STATE,
+        )
+    p.status = "DRAFT"
+    p.submitted_at = None
     db.flush()
     return p
 
@@ -184,18 +249,21 @@ def submit_payment(
             code=PARTICIPANTS_INCOMPLETE,
         )
 
-    if p.payment_type == "DIGITAL":
+    if p.payment_type in ("DIGITAL", "CASH"):
         evidence = db.execute(
             select(PaymentEvidence).where(PaymentEvidence.payment_id == payment_id)
         ).scalars().first()
         if evidence is None:
             raise ValidationError(
-                "Digital payment requires evidence before submission",
+                "Payment requires evidence (comprobante o recibo) before submission",
                 code=MISSING_PAYMENT_EVIDENCE,
             )
 
     p.status = "PENDING_APPROVAL"
     p.submitted_at = datetime.now(UTC)
+    p.rejected_at = None
+    p.rejection_reason = None
+    p.reviewed_by_user_id = None
     db.flush()
     return p
 
@@ -413,10 +481,10 @@ def evidence_upload_url(
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     _buyer_group(db, claims, p.attendee_group_id)
-    if p.status in ("APPROVED", "REJECTED"):
+    if p.status != "DRAFT":
         raise ConflictError(
-            "Cannot upload evidence to a reviewed payment",
-            code=PAYMENT_ALREADY_REVIEWED,
+            "Evidence can only be uploaded while the payment is in draft",
+            code=PAYMENT_INVALID_STATE,
         )
     
     ev = db.get(Event, p.event_id)
@@ -494,6 +562,11 @@ def register_evidence(
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     _buyer_group(db, claims, p.attendee_group_id)
+    if p.status != "DRAFT":
+        raise ConflictError(
+            "Evidence can only be registered while the payment is in draft",
+            code=PAYMENT_INVALID_STATE,
+        )
     bucket, object_key, fallback_url = _parse_object_ref()
     canonical_storage_path = body.storage_path
     if not canonical_storage_path and bucket and object_key:
@@ -589,6 +662,8 @@ def list_payment_evidences_buyer(
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     _buyer_group(db, claims, p.attendee_group_id)
+    if buyer_event_id(claims) != p.event_id:
+        raise HTTPException(status_code=403, detail="Token not valid for this event")
     evidences = list(
         db.execute(
             select(PaymentEvidence)
@@ -599,3 +674,30 @@ def list_payment_evidences_buyer(
     for evidence in evidences:
         setattr(evidence, "view_url", _signed_view_url(evidence) or evidence.file_url)
     return evidences
+
+
+@router.delete("/portal/payments/{payment_id}/evidences/{evidence_id}", status_code=204)
+def delete_buyer_payment_evidence(
+    payment_id: UUID,
+    evidence_id: UUID,
+    db: DbSession,
+    claims: BuyerClaimsDep,
+) -> None:
+    p = db.get(Payment, payment_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    _buyer_group(db, claims, p.attendee_group_id)
+    if buyer_event_id(claims) != p.event_id:
+        raise HTTPException(status_code=403, detail="Token not valid for this event")
+    if p.status != "DRAFT":
+        raise ConflictError(
+            "Evidence can only be removed while the payment is in draft",
+            code=PAYMENT_INVALID_STATE,
+        )
+    row = db.get(PaymentEvidence, evidence_id)
+    if row is None or row.payment_id != payment_id:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+    if row.uploaded_by_actor_type != "BUYER":
+        raise HTTPException(status_code=403, detail="Cannot delete this evidence")
+    db.delete(row)
+    db.flush()

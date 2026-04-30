@@ -13,7 +13,8 @@ import {
   CreditCard,
   Info,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { LegalMarkdownBlock } from '../../components/ui/LegalMarkdownBlock';
 
 type PaymentType = 'DIGITAL' | 'CASH';
 
@@ -51,6 +52,8 @@ const inferMimeType = (file: File): string => {
 export const PortalPayment = () => {
   const { session } = useAuthPortal();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resumePaymentId = searchParams.get('resume');
   const [loading, setLoading] = useState(false);
   const [initLoading, setInitLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -67,25 +70,65 @@ export const PortalPayment = () => {
 
   useEffect(() => {
     if (!session) return;
-    const fetchConfig = async () => {
+    let cancelled = false;
+    const run = async () => {
       try {
-        const res = await apiClient.get<any>(
-          `/portal/events/${session.eventId}/my-group`,
-          { token: session.sessionToken, isBearer: true }
-        );
+        const res = await apiClient.get<{
+          ticketPrice?: number;
+          paymentInstructions?: string | null;
+        }>(`/portal/events/${session.eventId}/my-group`, {
+          token: session.sessionToken,
+          isBearer: true,
+        });
+        if (cancelled) return;
         setTicketPrice(res.ticketPrice ?? 50000);
         setPaymentInstructions(res.paymentInstructions || null);
+
+        if (resumePaymentId) {
+          const p = await apiClient.get<{
+            id: string;
+            status: string;
+            paymentType: PaymentType;
+            ticketQuantity: number;
+          }>(`/portal/payments/${resumePaymentId}`, {
+            token: session.sessionToken,
+            isBearer: true,
+          });
+          if (cancelled) return;
+          if (p.status !== 'DRAFT') {
+            setError(
+              'Esta solicitud ya no está en borrador. Revisa el estado en «Mis pagos».',
+            );
+          } else {
+            setPaymentId(p.id);
+            setPaymentType(p.paymentType);
+            setTicketQuantity(p.ticketQuantity);
+            setStep(2);
+          }
+        }
       } catch (err) {
         console.error('Error fetching group/config:', err);
+        if (resumePaymentId) {
+          setError(
+            err instanceof Error ? err.message : 'No se pudo cargar la solicitud de pago.',
+          );
+        }
       } finally {
-        setInitLoading(false);
+        if (!cancelled) setInitLoading(false);
       }
     };
-    fetchConfig();
-  }, [session]);
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, resumePaymentId]);
 
   const handleCreatePayment = async () => {
     if (!session) return;
+    if (resumePaymentId && paymentId && paymentId === resumePaymentId) {
+      setStep(2);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -100,12 +143,7 @@ export const PortalPayment = () => {
         { token: session.sessionToken, isBearer: true },
       );
       setPaymentId(res.id);
-
-      if (paymentType === 'CASH') {
-        setStep(3); // cash flows skip the upload step
-      } else {
-        setStep(2);
-      }
+      setStep(2);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -201,7 +239,7 @@ export const PortalPayment = () => {
           bucket: uploaded.bucket,
           objectKey: uploaded.objectKey,
           mimeType: uploaded.mimeType,
-          evidenceType: 'DIGITAL_PROOF',
+          evidenceType: paymentType === 'CASH' ? 'CASH_RECEIPT_PHOTO' : 'DIGITAL_PROOF',
           storagePath: uploaded.storagePath,
           fileName: uploaded.fileName,
           sizeBytes: uploaded.sizeBytes,
@@ -284,9 +322,7 @@ export const PortalPayment = () => {
             ? 'Datos del pago'
             : step === 2
               ? 'Comprobante'
-              : paymentType === 'CASH'
-                ? 'Pago en efectivo'
-                : 'Enviado'}
+              : 'Enviado'}
         </span>
       </div>
 
@@ -334,7 +370,7 @@ export const PortalPayment = () => {
             >
               <Banknote size={20} style={{ marginBottom: '6px' }} />
               <div style={{ fontWeight: 600 }}>Efectivo</div>
-              <small style={{ color: 'var(--text-secondary)' }}>Paga en caja; el comité registra el recibo</small>
+              <small style={{ color: 'var(--text-secondary)' }}>Paga en caja y sube el recibo que te entreguen</small>
             </button>
           </div>
 
@@ -369,17 +405,17 @@ export const PortalPayment = () => {
                 style={{ padding: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}
               >
                 <strong style={{ color: 'var(--text-primary)' }}>Datos bancarios:</strong>
-                <br />
                 {paymentInstructions ? (
-                  <span style={{ whiteSpace: 'pre-wrap' }}>{paymentInstructions}</span>
+                  <LegalMarkdownBlock
+                    content={paymentInstructions}
+                    className="legal-md-block--payment-instructions"
+                  />
                 ) : (
-                  <>
-                    Banco: Bancolombia — Cuenta Ahorros 123-456789-00
-                    <br />
-                    Titular: Comité de Grado 2026
-                    <br />
-                    Referencia: Tu código de estudiante
-                  </>
+                  <div style={{ marginTop: '10px', color: 'var(--text-secondary)' }}>
+                    <p style={{ margin: '0 0 0.5em' }}>Banco: Bancolombia — Cuenta Ahorros 123-456789-00</p>
+                    <p style={{ margin: '0 0 0.5em' }}>Titular: Comité de Grado 2026</p>
+                    <p style={{ margin: 0 }}>Referencia: Tu código de estudiante</p>
+                  </div>
                 )}
               </div>
             ) : (
@@ -397,24 +433,28 @@ export const PortalPayment = () => {
               >
                 <Info size={20} color="var(--accent-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div>
-                  Al elegir efectivo, dirígete a la ventanilla del comité. La foto del recibo de caja será
-                  registrada por el comité; tu pago pasa directamente a revisión.
+                  Paga en la ventanilla del comité. Solicita el recibo de pago y súbelo aquí en el siguiente paso
+                  (foto o PDF), igual que el comprobante de transferencia.
                 </div>
               </div>
             )}
 
             <Button onClick={handleCreatePayment} isLoading={loading}>
-              {paymentType === 'CASH' ? 'Registrar intención y continuar' : 'Continuar al comprobante →'}
+              Continuar al comprobante →
             </Button>
           </div>
         </GlassCard>
       )}
 
-      {step === 2 && paymentType === 'DIGITAL' && (
+      {step === 2 && (
         <GlassCard className="animate-slide-up">
-          <h3 style={{ marginTop: 0 }}>Paso 2: Sube tu comprobante</h3>
+          <h3 style={{ marginTop: 0 }}>
+            {paymentType === 'CASH' ? 'Paso 2: Sube el recibo de caja' : 'Paso 2: Sube tu comprobante'}
+          </h3>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
-            Adjunta el pantallazo o PDF de la transferencia (máx. {EVIDENCE_MAX_MB} MB).
+            {paymentType === 'CASH'
+              ? `Adjunta la foto o el PDF del recibo de pago en efectivo que te entregue el comité (máx. ${EVIDENCE_MAX_MB} MB).`
+              : `Adjunta el pantallazo o PDF de la transferencia (máx. ${EVIDENCE_MAX_MB} MB).`}
           </p>
 
           <div
@@ -464,8 +504,30 @@ export const PortalPayment = () => {
             </p>
           )}
 
+          {resumePaymentId && (
+            <p
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '12px',
+              }}
+            >
+              Corrigiendo solicitud: {paymentType === 'CASH' ? 'Efectivo' : 'Transferencia'} ·{' '}
+              {ticketQuantity} boleta(s).
+            </p>
+          )}
           <div style={{ display: 'flex', gap: '12px' }}>
-            <Button variant="secondary" onClick={() => setStep(1)} style={{ flex: 1 }}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (resumePaymentId) {
+                  navigate(`/portal/${session.eventId}/payment-status`);
+                } else {
+                  setStep(1);
+                }
+              }}
+              style={{ flex: 1 }}
+            >
               ← Volver
             </Button>
             <Button
@@ -486,9 +548,7 @@ export const PortalPayment = () => {
           style={{ textAlign: 'center', padding: '48px 20px' }}
         >
           <FileCheck2 size={72} style={{ color: 'var(--success)', margin: '0 auto 24px' }} />
-          <h3 style={{ margin: '0 0 12px' }}>
-            {paymentType === 'CASH' ? 'Pago en efectivo registrado' : '¡Pago enviado!'}
-          </h3>
+          <h3 style={{ margin: '0 0 12px' }}>¡Pago enviado!</h3>
           <p
             style={{
               color: 'var(--text-secondary)',
@@ -498,7 +558,7 @@ export const PortalPayment = () => {
             }}
           >
             {paymentType === 'CASH'
-              ? 'Dirígete a la ventanilla del comité para completar el pago. Una vez registrada la evidencia en caja y aprobada, podrás seleccionar tu mesa.'
+              ? 'Tu recibo de efectivo fue enviado al comité. Una vez validado y aprobado, podrás elegir tu mesa en el mapa.'
               : 'Tu comprobante fue enviado al comité. Una vez aprobado, recibirás acceso para elegir tu mesa.'}
           </p>
           <Button variant="secondary" onClick={() => navigate(`/portal/${session.eventId}/dashboard`)}>

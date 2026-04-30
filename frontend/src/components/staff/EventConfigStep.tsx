@@ -16,6 +16,7 @@ interface Props {
 export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   
   // Event & Configuration state unified
   const [formData, setFormData] = useState({
@@ -29,19 +30,37 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
       maxSale: 3
   });
 
+  const toIsoOrNull = (value: string): string | null => {
+    if (!value || !value.trim()) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+  };
+
   const handleFinish = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     setLoading(true);
     
     try {
+      const eventDateIso = toIsoOrNull(formData.eventDate);
+      const presaleStartIso = toIsoOrNull(formData.presaleStart);
+      const presaleEndIso = toIsoOrNull(formData.presaleEnd);
+      const saleStartIso = toIsoOrNull(formData.saleStart);
+      const saleEndIso = toIsoOrNull(formData.saleEnd);
+
+      if (!eventDateIso || !presaleStartIso || !presaleEndIso || !saleStartIso || !saleEndIso) {
+        throw new Error('Hay fechas inválidas en el formulario. Revisa el cronograma e intenta de nuevo.');
+      }
+
       // 1. Create Event linking Venue
        const resEvent = await apiClient.post<any>('/events', {
            tenantId: wizardData.tenantId,
            venueId: wizardData.venueId,
            name: formData.eventName,
-           eventDate: new Date(formData.eventDate || new Date()).toISOString(),
-           startsAt: formData.presaleStart ? new Date(formData.presaleStart).toISOString() : undefined,
-           endsAt: formData.saleEnd ? new Date(formData.saleEnd).toISOString() : undefined,
+           eventDate: eventDateIso,
+           startsAt: presaleStartIso,
+           endsAt: saleEndIso,
            venueNameSnapshot: wizardData.venueName
        }, { token: sessionToken, isBearer: true });
        
@@ -55,15 +74,15 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
 
       // 3. Put configurations (§4.2.1 uses PUT, includes venue/event date fields)
        await apiClient.put(`/events/${newEventId}/configuration`, {
-          presaleStartDate: formData.presaleStart ? new Date(formData.presaleStart).toISOString() : new Date().toISOString(),
-          presaleEndDate: formData.presaleEnd ? new Date(formData.presaleEnd).toISOString() : new Date().toISOString(),
-          saleStartDate: formData.saleStart ? new Date(formData.saleStart).toISOString() : new Date().toISOString(),
-          saleEndDate: formData.saleEnd ? new Date(formData.saleEnd).toISOString() : new Date().toISOString(),
+          presaleStartDate: presaleStartIso,
+          presaleEndDate: presaleEndIso,
+          saleStartDate: saleStartIso,
+          saleEndDate: saleEndIso,
           maxPresaleTickets: formData.maxPresale,
           maxSaleTickets: formData.maxSale,
           timezone: "America/Bogota",
           mapVisibilityPolicy: "AFTER_PAYMENT_APPROVED",
-          eventDate: formData.eventDate ? new Date(formData.eventDate).toISOString() : undefined,
+          eventDate: eventDateIso,
           venueName: wizardData.venueName || undefined,
        }, { token: sessionToken, isBearer: true });
 
@@ -71,7 +90,7 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
        setSuccessEventId(newEventId);
     } catch (err: any) {
        console.error("Event creation error:", err);
-       alert(`Error creando el Evento: ${err?.message || JSON.stringify(err)}`);
+       setFormError(err?.message || 'No fue posible crear el evento.');
     } finally {
       setLoading(false);
     }
@@ -102,6 +121,11 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
       <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
          Establece las fechas de las etapas de venta. Has escogido el salón <strong>{wizardData.venueName}</strong> y Layout <strong>{wizardData.layoutName}</strong>.
       </p>
+      {formError && (
+        <div className="glass-panel" style={{ marginBottom: '16px', border: '1px solid var(--error)', color: 'var(--error)', padding: '12px 16px' }}>
+          {formError}
+        </div>
+      )}
 
       <form onSubmit={handleFinish}>
         <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

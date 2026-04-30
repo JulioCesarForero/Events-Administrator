@@ -102,15 +102,15 @@ class TestStageTicketLimits:
 
 
 class TestEvidenceRequirement:
-    """Test RN-PAY-05: digital payment requires evidence before submit."""
+    """Test RN-PAY-05: digital and cash (buyer) payments require evidence before submit."""
 
     def test_digital_without_evidence_blocked(self):
         """DIGITAL payment without evidence should raise MISSING_PAYMENT_EVIDENCE."""
         assert MISSING_PAYMENT_EVIDENCE == "MISSING_PAYMENT_EVIDENCE"
 
-    def test_cash_does_not_require_evidence_from_buyer(self):
-        """CASH payment evidence is handled by staff at creation."""
-        pass
+    def test_cash_requires_buyer_evidence_before_submit(self):
+        """CASH from portal: buyer uploads receipt like transfer; submit requires evidence."""
+        assert MISSING_PAYMENT_EVIDENCE == "MISSING_PAYMENT_EVIDENCE"
 
 
 class TestApproveReject:
