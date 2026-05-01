@@ -58,6 +58,7 @@ export interface StaffSession {
    * per-event assignments.
    */
   role?: string;
+  eventAssignments?: Array<{ eventId: string; eventName: string; role: string }>;
 }
 
 interface AuthStaffContextType {

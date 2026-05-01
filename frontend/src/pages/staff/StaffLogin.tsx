@@ -30,16 +30,24 @@ export const StaffLogin = () => {
       const res = await apiClient.post<any>('/auth/staff-login', { email, password });
 
       const meRes = await apiClient.get<any>('/auth/me', { token: res.accessToken, isBearer: true });
+      const role = meRes.memberships?.[0]?.role || '';
+      const eventAssignments = meRes.eventAssignments || [];
       const tenantId = meRes.memberships?.[0]?.tenantId || '';
 
       setSession({
         accessToken: res.accessToken,
         userId: res.userId,
         email: res.email,
-        tenantId: tenantId
+        tenantId,
+        role,
+        eventAssignments
       });
 
-      navigate(`/staff/dashboard`);
+      if (!tenantId && eventAssignments.length > 0) {
+        navigate(`/staff/events/${eventAssignments[0].eventId}/dashboard`);
+      } else {
+        navigate(`/staff/dashboard`);
+      }
     } catch (err: any) {
       setError(err.message || 'Credenciales inválidas');
     } finally {

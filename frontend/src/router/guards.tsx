@@ -75,7 +75,7 @@ export const RequireStaffAuth = ({ children }: GuardProps) => {
   return <>{children}</>;
 };
 
-const TENANT_ADMIN_ROLES = new Set(['ADMIN', 'OWNER']);
+const TENANT_ADMIN_ROLES = new Set(['ADMIN', 'OWNER', 'TENANT_ADMIN', 'SUPER_ADMIN']);
 
 /**
  * Extra gate on top of `RequireStaffAuth` that only lets tenant admins through.

@@ -94,12 +94,19 @@ class TenantMembershipItem(CamelModel):
     role: str
 
 
+class EventAssignmentItem(CamelModel):
+    event_id: UUID
+    event_name: str
+    role: str
+
+
 class StaffMeResponse(CamelModel):
     user_id: UUID
     email: str
     display_name: str
     status: str
     memberships: list[TenantMembershipItem]
+    event_assignments: list[EventAssignmentItem] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +197,8 @@ def post_staff_register(
     )
 
 
+from infrastructure.persistence.models import EventOrganizerAssignment, Event
+
 @router.get("/me", response_model=StaffMeResponse)
 def get_me(staff: StaffUserDep, db: DbSession) -> StaffMeResponse:
     rows = db.execute(
@@ -207,10 +216,26 @@ def get_me(staff: StaffUserDep, db: DbSession) -> StaffMeResponse:
         for m, t in rows
     ]
 
+    event_rows = db.execute(
+        select(EventOrganizerAssignment, Event)
+        .join(Event, Event.id == EventOrganizerAssignment.event_id)
+        .where(EventOrganizerAssignment.user_id == staff.id)
+    ).all()
+
+    events = [
+        EventAssignmentItem(
+            event_id=a.event_id,
+            event_name=e.name,
+            role=a.role,
+        )
+        for a, e in event_rows
+    ]
+
     return StaffMeResponse(
         user_id=staff.id,
         email=staff.email,
         display_name=staff.display_name,
         status=staff.status,
         memberships=memberships,
+        event_assignments=events,
     )

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from domain.error_codes import INVALID_PAYLOAD
 from domain.exceptions import ValidationError
 from infrastructure.persistence.models import StudentImportBatch, StudentRecord
-from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
+from shared.api.deps import DbSession, StaffUserDep, ensure_event_student_manager_access
 
 REQUIRED_IMPORT_COLUMNS = {"codigo_unico", "apellidos", "nombres"}
 
@@ -58,7 +58,7 @@ def create_import(
         raw = raw.replace(" ", "_").replace("-", "_")
         return raw
 
-    ensure_event_staff_access(db, staff, event_id)
+    ensure_event_student_manager_access(db, staff, event_id)
     
     # Pre-validate columns if provided in the request
     if body.expected_columns is not None:
@@ -202,7 +202,7 @@ def get_import_status(
     db: DbSession,
     staff: StaffUserDep,
 ) -> StudentImportBatch:
-    ensure_event_staff_access(db, staff, event_id)
+    ensure_event_student_manager_access(db, staff, event_id)
     b = db.get(StudentImportBatch, batch_id)
     if b is None or b.event_id != event_id:
         from fastapi import HTTPException

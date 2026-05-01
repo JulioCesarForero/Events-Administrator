@@ -8,12 +8,29 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, UploadCloud, Edit2, Trash2, Plus, Search } from 'lucide-react';
 import { useGCSUpload } from '../../hooks/useGCSUpload';
 
-type StudentOut = {
-  id: string;
+type StudentSummaryOut = {
+  attendeeGroupId: string | null;
+  studentRecordId: string;
   studentCode: string;
+  studentName: string;
   firstName: string;
   lastName: string;
-  isActive: boolean;
+  tickets: {
+    reported: number;
+    approved: number;
+    pending: number;
+    rejected: number;
+  };
+  reservations: {
+    count: number;
+    spotsReserved: number;
+  };
+  flags: {
+    hasApprovedPayment: boolean;
+    canReserve: boolean;
+    isOverbooked: boolean;
+    pendingAction: boolean;
+  };
 };
 
 export const StaffStudents = () => {
@@ -23,14 +40,15 @@ export const StaffStudents = () => {
   const { uploadFile, isUploading } = useGCSUpload();
 
   // Data State
-  const [students, setStudents] = useState<StudentOut[]>([]);
+  const [students, setStudents] = useState<StudentSummaryOut[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'' | 'pending' | 'no_reservation' | 'inconsistent'>('');
 
   // Modal States
   const [showImportModal, setShowImportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<StudentOut | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<StudentSummaryOut | null>(null);
 
   // Edit / Form State
   const [formData, setFormData] = useState({ studentCode: '', firstName: '', lastName: '' });
@@ -44,20 +62,23 @@ export const StaffStudents = () => {
     if (session && eventId) {
       loadStudents();
     }
-  }, [session, eventId, search]);
+  }, [session, eventId, search, filterType]);
 
   const loadStudents = async () => {
     setLoading(true);
     try {
-      // Usamos el endpoint backend descubierto
-      const res = await apiClient.get<any>(`/events/${eventId}/students?limit=200&search=${encodeURIComponent(search)}`, { 
+      let queryUrl = `/events/${eventId}/students/summary?search=${encodeURIComponent(search)}`;
+      if (filterType === 'pending') queryUrl += '&payment_status=PENDING_APPROVAL';
+      if (filterType === 'no_reservation') queryUrl += '&has_reservation=false';
+      if (filterType === 'inconsistent') queryUrl += '&is_inconsistent=true';
+
+      const res = await apiClient.get<StudentSummaryOut[]>(queryUrl, { 
         token: session?.accessToken, 
         isBearer: true 
       });
-      setStudents(res.items || []);
+      setStudents(res || []);
     } catch (err) {
       console.error('Error fetching students:', err);
-      // Fallback vacio en caso de falla momentanea
       setStudents([]);
     } finally {
       setLoading(false);
@@ -70,7 +91,7 @@ export const StaffStudents = () => {
     if (!window.confirm('¿Seguro que deseas eliminar este estudiante? Es una acción irreversible.')) return;
     try {
       await apiClient.delete(`/events/${eventId}/students/${id}`, { token: session?.accessToken, isBearer: true });
-      setStudents(prev => prev.filter(s => s.id !== id));
+      loadStudents();
     } catch (err: any) {
       alert(`Error eliminando registro: ${err?.message || 'Desconocido'}`);
     }
@@ -82,7 +103,7 @@ export const StaffStudents = () => {
     setShowEditModal(true);
   };
 
-  const handleOpenEdit = (student: StudentOut) => {
+  const handleOpenEdit = (student: StudentSummaryOut) => {
     setSelectedStudent(student);
     setFormData({ studentCode: student.studentCode, firstName: student.firstName, lastName: student.lastName });
     setShowEditModal(true);
@@ -92,13 +113,13 @@ export const StaffStudents = () => {
     try {
       if (selectedStudent) {
         // Edit Existing (PATCH)
-        const updated = await apiClient.patch<StudentOut>(`/events/${eventId}/students/${selectedStudent.id}`, {
+        await apiClient.patch(`/events/${eventId}/students/${selectedStudent.studentRecordId}`, {
           studentCode: formData.studentCode,
           firstName: formData.firstName,
           lastName: formData.lastName
         }, { token: session?.accessToken, isBearer: true });
         
-        setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
+        loadStudents();
       } else {
         // Create New (via bulk api endpoint with 1 row)
         await apiClient.post(`/events/${eventId}/student-imports`, {
@@ -184,6 +205,8 @@ export const StaffStudents = () => {
 
   if (!session) return null;
 
+  const isAdmin = ['ADMIN', 'OWNER', 'TENANT_ADMIN', 'SUPER_ADMIN'].includes(session.role || '');
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative' }}>
       
@@ -195,14 +218,18 @@ export const StaffStudents = () => {
           <h2 style={{ margin: 0 }}>Directorio de Estudiantes</h2>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <Button variant="secondary" onClick={() => setShowImportModal(true)}>
-            <UploadCloud size={18} style={{ marginRight: '8px' }} />
-            Carga Masiva (CSV)
-          </Button>
-          <Button onClick={handleOpenCreate}>
-            <Plus size={18} style={{ marginRight: '8px' }} />
-            Añadir Estudiante
-          </Button>
+          {isAdmin && (
+            <>
+              <Button variant="secondary" onClick={() => setShowImportModal(true)}>
+                <UploadCloud size={18} style={{ marginRight: '8px' }} />
+                Carga Masiva (CSV)
+              </Button>
+              <Button onClick={handleOpenCreate}>
+                <Plus size={18} style={{ marginRight: '8px' }} />
+                Añadir Estudiante
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -221,42 +248,117 @@ export const StaffStudents = () => {
            />
         </div>
 
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          <Button 
+            variant={filterType === '' ? 'primary' : 'secondary'} 
+            onClick={() => setFilterType('')}
+            size="sm"
+          >
+            Todos
+          </Button>
+          <Button 
+            variant={filterType === 'pending' ? 'primary' : 'secondary'} 
+            onClick={() => setFilterType('pending')}
+            size="sm"
+          >
+            Con pagos pendientes
+          </Button>
+          <Button 
+            variant={filterType === 'no_reservation' ? 'primary' : 'secondary'} 
+            onClick={() => setFilterType('no_reservation')}
+            size="sm"
+          >
+            Sin reservas
+          </Button>
+          <Button 
+            variant={filterType === 'inconsistent' ? 'primary' : 'secondary'} 
+            onClick={() => setFilterType('inconsistent')}
+            size="sm"
+          >
+            Inconsistentes
+          </Button>
+        </div>
+
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>
                 <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>CÓDIGO ÚNICO</th>
-                <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>NOMBRES</th>
-                <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>APELLIDOS</th>
-                <th style={{ padding: '12px 16px', fontWeight: 'normal', textAlign: 'right' }}>ACCIONES</th>
+                <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>NOMBRE</th>
+                <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>BOLETAS (A/P/R)</th>
+                <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>RESERVAS (N° / Cupos)</th>
+                <th style={{ padding: '12px 16px', fontWeight: 'normal' }}>ESTADO</th>
+                {isAdmin && <th style={{ padding: '12px 16px', fontWeight: 'normal', textAlign: 'right' }}>ACCIONES</th>}
               </tr>
             </thead>
             <tbody>
               {students.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
-                    No hay estudiantes registrados.
+                  <td colSpan={isAdmin ? 6 : 5} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                    No hay estudiantes registrados o no coinciden con los filtros.
                   </td>
                 </tr>
               )}
               {loading && students.length === 0 && (
-                <tr><td colSpan={4} style={{ textAlign: 'center', padding: '32px' }}>Cargando...</td></tr>
+                <tr><td colSpan={isAdmin ? 6 : 5} style={{ textAlign: 'center', padding: '32px' }}>Cargando...</td></tr>
               )}
-              {students.map(std => (
-                <tr key={std.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '12px 16px' }}>{std.studentCode}</td>
-                  <td style={{ padding: '12px 16px' }}>{std.firstName}</td>
-                  <td style={{ padding: '12px 16px' }}>{std.lastName}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button onClick={() => handleOpenEdit(std)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)' }} title="Editar">
-                      <Edit2 size={18} />
-                    </button>
-                    <button onClick={() => handleDelete(std.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ff4d4d' }} title="Eliminar">
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {students.map(std => {
+                let badgeClass = 'var(--text-muted)';
+                let badgeText = 'Sin Acción';
+                let badgeBg = 'rgba(255,255,255,0.05)';
+
+                if (std.flags.isOverbooked) {
+                  badgeText = 'Inconsistente';
+                  badgeClass = '#ff4d4d'; // Rojo claro
+                  badgeBg = 'rgba(255, 77, 77, 0.1)';
+                } else if (std.flags.pendingAction) {
+                  badgeText = 'Pendiente';
+                  badgeClass = '#ffc107'; // Amarillo
+                  badgeBg = 'rgba(255, 193, 7, 0.1)';
+                } else if (std.flags.hasApprovedPayment) {
+                  badgeText = 'Aprobado';
+                  badgeClass = 'var(--success)';
+                  badgeBg = 'rgba(0, 204, 136, 0.1)';
+                }
+
+                return (
+                  <tr key={std.studentRecordId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: '500' }}>{std.studentCode}</td>
+                    <td style={{ padding: '12px 16px' }}>{std.studentName}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ color: 'var(--success)' }}>{std.tickets.approved}</span> /&nbsp;
+                      <span style={{ color: '#ffc107' }}>{std.tickets.pending}</span> /&nbsp;
+                      <span style={{ color: '#ff4d4d' }}>{std.tickets.rejected}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      {std.reservations.count} res / {std.reservations.spotsReserved} cupos
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        color: badgeClass,
+                        backgroundColor: badgeBg
+                      }}>
+                        {badgeText}
+                      </span>
+                    </td>
+                    {isAdmin && (
+                      <td style={{ padding: '12px 16px', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <button onClick={() => handleOpenEdit(std)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)' }} title="Editar">
+                          <Edit2 size={18} />
+                        </button>
+                        <button onClick={() => handleDelete(std.studentRecordId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ff4d4d' }} title="Eliminar">
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -82,6 +82,7 @@ export interface StaffMeResponse {
   displayName: string;
   status: string;
   memberships: Array<{ tenantId: string; tenantName: string; role: string }>;
+  eventAssignments: Array<{ eventId: string; eventName: string; role: string }>;
 }
 
 /* =========================================================================

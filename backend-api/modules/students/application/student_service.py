@@ -5,7 +5,13 @@ from sqlalchemy.orm import Session
 
 from domain.error_codes import INVALID_PAYLOAD, NOT_FOUND
 from domain.exceptions import ConflictError, NotFoundError, ValidationError
-from infrastructure.persistence.models import AttendeeGroup, StudentRecord
+from infrastructure.persistence.models import (
+    AttendeeGroup,
+    Payment,
+    Reservation,
+    StudentRecord,
+    TableReservation,
+)
 
 
 def get_student(db: Session, event_id: UUID, student_id: UUID) -> StudentRecord:
@@ -104,3 +110,118 @@ def delete_student(db: Session, event_id: UUID, student_id: UUID) -> None:
 
     db.delete(rec)
     db.flush()
+
+
+def get_students_summary(
+    db: Session,
+    event_id: UUID,
+    *,
+    search: str | None = None,
+    payment_status: str | None = None,
+    has_reservation: bool | None = None,
+    is_inconsistent: bool | None = None,
+) -> list[dict]:
+    # CTEs / Subqueries for Aggregation
+    
+    payments_sq = select(
+        Payment.attendee_group_id,
+        func.coalesce(func.sum(Payment.ticket_quantity), 0).label("reported"),
+        func.coalesce(func.sum(Payment.ticket_quantity).filter(Payment.status == 'APPROVED'), 0).label("approved"),
+        func.coalesce(func.sum(Payment.ticket_quantity).filter(Payment.status == 'PENDING_APPROVAL'), 0).label("pending"),
+        func.coalesce(func.sum(Payment.ticket_quantity).filter(Payment.status == 'REJECTED'), 0).label("rejected"),
+    ).where(
+        Payment.event_id == event_id,
+        Payment.status != 'DRAFT'
+    ).group_by(Payment.attendee_group_id).subquery()
+
+    reservations_sq = select(
+        Reservation.attendee_group_id,
+        func.count(Reservation.id).filter(Reservation.status == 'CONFIRMED').label("count")
+    ).where(
+        Reservation.event_id == event_id
+    ).group_by(Reservation.attendee_group_id).subquery()
+
+    table_res_sq = select(
+        TableReservation.attendee_group_id,
+        func.coalesce(func.sum(TableReservation.spots_reserved), 0).label("spots")
+    ).where(
+        TableReservation.event_id == event_id,
+        TableReservation.status == 'ACTIVE'
+    ).group_by(TableReservation.attendee_group_id).subquery()
+
+    stmt = select(
+        AttendeeGroup.id.label("attendee_group_id"),
+        StudentRecord.id.label("student_record_id"),
+        StudentRecord.student_code,
+        func.coalesce(AttendeeGroup.display_name, StudentRecord.first_name + " " + StudentRecord.last_name).label("display_name"),
+        StudentRecord.first_name,
+        StudentRecord.last_name,
+        func.coalesce(payments_sq.c.reported, 0).label("reported"),
+        func.coalesce(payments_sq.c.approved, 0).label("approved"),
+        func.coalesce(payments_sq.c.pending, 0).label("pending"),
+        func.coalesce(payments_sq.c.rejected, 0).label("rejected"),
+        func.coalesce(reservations_sq.c.count, 0).label("res_count"),
+        func.coalesce(table_res_sq.c.spots, 0).label("res_spots"),
+    ).select_from(StudentRecord)\
+     .outerjoin(AttendeeGroup, StudentRecord.id == AttendeeGroup.student_record_id)\
+     .outerjoin(payments_sq, AttendeeGroup.id == payments_sq.c.attendee_group_id)\
+     .outerjoin(reservations_sq, AttendeeGroup.id == reservations_sq.c.attendee_group_id)\
+     .outerjoin(table_res_sq, AttendeeGroup.id == table_res_sq.c.attendee_group_id)\
+     .where(StudentRecord.event_id == event_id)
+
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(
+            StudentRecord.student_code.ilike(pattern) |
+            StudentRecord.first_name.ilike(pattern) |
+            StudentRecord.last_name.ilike(pattern)
+        )
+    
+    if payment_status == "PENDING_APPROVAL":
+        stmt = stmt.where(func.coalesce(payments_sq.c.pending, 0) > 0)
+    elif payment_status == "APPROVED":
+        stmt = stmt.where(func.coalesce(payments_sq.c.approved, 0) > 0)
+
+    if has_reservation is True:
+        stmt = stmt.where(func.coalesce(reservations_sq.c.count, 0) > 0)
+    elif has_reservation is False:
+        stmt = stmt.where(func.coalesce(reservations_sq.c.count, 0) == 0)
+
+    if is_inconsistent is True:
+        stmt = stmt.where(func.coalesce(table_res_sq.c.spots, 0) > func.coalesce(payments_sq.c.approved, 0))
+
+    stmt = stmt.order_by(StudentRecord.last_name.asc(), StudentRecord.first_name.asc())
+
+    rows = db.execute(stmt).all()
+
+    results = []
+    for row in rows:
+        tickets_approved = row.approved
+        spots = row.res_spots
+        tickets_pending = row.pending
+
+        results.append({
+            "attendeeGroupId": str(row.attendee_group_id) if row.attendee_group_id else None,
+            "studentRecordId": str(row.student_record_id),
+            "studentCode": row.student_code,
+            "studentName": row.display_name,
+            "firstName": row.first_name,
+            "lastName": row.last_name,
+            "tickets": {
+                "reported": row.reported,
+                "approved": tickets_approved,
+                "pending": tickets_pending,
+                "rejected": row.rejected
+            },
+            "reservations": {
+                "count": row.res_count,
+                "spotsReserved": spots
+            },
+            "flags": {
+                "hasApprovedPayment": tickets_approved > 0,
+                "canReserve": tickets_approved > 0,
+                "isOverbooked": spots > tickets_approved,
+                "pendingAction": tickets_pending > 0
+            }
+        })
+    return results

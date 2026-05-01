@@ -358,3 +358,4 @@ firebase deploy --only hosting
 | Build falla en Cloud Build | Dependencias / Dockerfile | `gcloud builds log` para ver el error detallado |
 | `MODULE_NOT_FOUND` en Cloud Run | `.gcloudignore` excluye archivos necesarios | Revisar qué se excluye |
 
+

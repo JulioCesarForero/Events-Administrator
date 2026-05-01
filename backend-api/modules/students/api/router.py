@@ -9,10 +9,16 @@ from infrastructure.persistence.models import StudentRecord
 from modules.students.application.student_service import (
     delete_student,
     get_student,
+    get_students_summary,
     list_students,
     update_student,
 )
-from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
+from shared.api.deps import (
+    DbSession,
+    StaffUserDep,
+    ensure_event_viewer_access,
+    ensure_event_student_manager_access,
+)
 from shared.api.schemas import CamelModel, CamelOrmModel
 
 router = APIRouter(tags=["students"])
@@ -48,6 +54,37 @@ class StudentUpdate(CamelModel):
     is_active: bool | None = None
 
 
+class TicketsSummary(CamelModel):
+    reported: int
+    approved: int
+    pending: int
+    rejected: int
+
+
+class ReservationsSummary(CamelModel):
+    count: int
+    spots_reserved: int
+
+
+class FlagsSummary(CamelModel):
+    has_approved_payment: bool
+    can_reserve: bool
+    is_overbooked: bool
+    pending_action: bool
+
+
+class StudentSummaryOut(CamelModel):
+    attendee_group_id: UUID | None
+    student_record_id: UUID
+    student_code: str
+    student_name: str
+    first_name: str
+    last_name: str
+    tickets: TicketsSummary
+    reservations: ReservationsSummary
+    flags: FlagsSummary
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -65,7 +102,7 @@ def list_event_students(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> StudentListResponse:
-    ensure_event_staff_access(db, staff, event_id)
+    ensure_event_viewer_access(db, staff, event_id)
     rows, total = list_students(
         db, event_id, search=search, is_active=is_active, offset=offset, limit=limit
     )
@@ -74,6 +111,30 @@ def list_event_students(
         total=total,
         offset=offset,
         limit=limit,
+    )
+
+
+@router.get(
+    "/events/{event_id}/students/summary",
+    response_model=list[StudentSummaryOut],
+)
+def list_event_students_summary(
+    event_id: UUID,
+    db: DbSession,
+    staff: StaffUserDep,
+    search: str | None = Query(default=None, max_length=200),
+    payment_status: str | None = Query(default=None),
+    has_reservation: bool | None = Query(default=None),
+    is_inconsistent: bool | None = Query(default=None),
+) -> list[dict]:
+    ensure_event_viewer_access(db, staff, event_id)
+    return get_students_summary(
+        db,
+        event_id,
+        search=search,
+        payment_status=payment_status,
+        has_reservation=has_reservation,
+        is_inconsistent=is_inconsistent,
     )
 
 
@@ -87,7 +148,7 @@ def get_event_student(
     db: DbSession,
     staff: StaffUserDep,
 ) -> StudentRecord:
-    ensure_event_staff_access(db, staff, event_id)
+    ensure_event_viewer_access(db, staff, event_id)
     return get_student(db, event_id, student_id)
 
 
@@ -102,7 +163,7 @@ def patch_event_student(
     db: DbSession,
     staff: StaffUserDep,
 ) -> StudentRecord:
-    ensure_event_staff_access(db, staff, event_id)
+    ensure_event_student_manager_access(db, staff, event_id)
     return update_student(
         db,
         event_id,
@@ -124,5 +185,5 @@ def delete_event_student(
     db: DbSession,
     staff: StaffUserDep,
 ) -> None:
-    ensure_event_staff_access(db, staff, event_id)
+    ensure_event_student_manager_access(db, staff, event_id)
     delete_student(db, event_id, student_id)

@@ -33,7 +33,8 @@ from shared.api.deps import (
     StaffUserDep,
     buyer_event_id,
     buyer_group_id,
-    ensure_event_staff_access,
+    ensure_event_payment_access,
+    ensure_event_viewer_access,
 )
 from modules.payments.application.stage_capacity import (
     assert_approval_fits_bucket,
@@ -278,7 +279,7 @@ def payment_inbox(
     status: str = Query(default="PENDING_APPROVAL"),
     q: str | None = Query(default=None),
 ) -> list[PaymentInboxOut]:
-    ensure_event_staff_access(db, staff, event_id)
+    ensure_event_viewer_access(db, staff, event_id)
     stmt = (
         select(
             Payment,
@@ -330,7 +331,7 @@ def approve_payment(
     p = db.get(Payment, payment_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
-    ensure_event_staff_access(db, staff, p.event_id)
+    ensure_event_payment_access(db, staff, p.event_id)
     if p.status != "PENDING_APPROVAL":
         raise ConflictError("Payment is not pending approval", code=PAYMENT_ALREADY_REVIEWED)
     original_qty = p.ticket_quantity
@@ -390,7 +391,7 @@ def reject_payment(
     p = db.get(Payment, payment_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
-    ensure_event_staff_access(db, staff, p.event_id)
+    ensure_event_payment_access(db, staff, p.event_id)
     if p.status != "PENDING_APPROVAL":
         raise ConflictError("Payment is not pending approval", code=PAYMENT_ALREADY_REVIEWED)
     p.status = "REJECTED"
@@ -416,7 +417,7 @@ def create_cash_payment(
     db: DbSession,
     staff: StaffUserDep,
 ) -> Payment:
-    ensure_event_staff_access(db, staff, event_id)
+    ensure_event_payment_access(db, staff, event_id)
     g = db.get(AttendeeGroup, body.attendee_group_id)
     if g is None or g.event_id != event_id:
         raise HTTPException(status_code=400, detail="Invalid group for event")
@@ -645,7 +646,7 @@ def list_payment_evidences(
     p = db.get(Payment, payment_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Payment not found")
-    ensure_event_staff_access(db, staff, p.event_id)
+    ensure_event_payment_access(db, staff, p.event_id)
     evidences = list(
         db.execute(
             select(PaymentEvidence)
