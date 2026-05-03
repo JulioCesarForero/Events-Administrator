@@ -32,8 +32,8 @@ class RateLimitRule:
 
 
 DEFAULT_RULES: tuple[RateLimitRule, ...] = (
-    RateLimitRule("/v1/auth/code-login", max_requests=10, window_seconds=900),
-    RateLimitRule("/v1/auth/staff-login", max_requests=10, window_seconds=900),
+    RateLimitRule("/v1/auth/code-login", max_requests=20, window_seconds=600),
+    RateLimitRule("/v1/auth/staff-login", max_requests=20, window_seconds=600),
 )
 
 

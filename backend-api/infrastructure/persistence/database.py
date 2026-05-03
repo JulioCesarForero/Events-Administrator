@@ -17,9 +17,13 @@ def get_engine():
         _engine = create_engine(
             settings.database_url,
             pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=2,
+            pool_size=60,
+            max_overflow=40,
             pool_recycle=1800,
+            connect_args={
+                'connect_timeout': 10,
+                'options': '-c statement_timeout=30000'
+            },
             echo=settings.debug,
         )
         _session_factory = sessionmaker(
