@@ -169,6 +169,24 @@ def ensure_tenant_admin(
     return m
 
 
+def ensure_super_admin(
+    db: Session, staff: StaffUser
+) -> UserTenantMembership:
+    # Check if the user is a SUPER_ADMIN anywhere (global super admin rights)
+    global_super_admin = db.execute(
+        select(UserTenantMembership).where(
+            UserTenantMembership.user_id == staff.id,
+            UserTenantMembership.role == "SUPER_ADMIN",
+        )
+    ).scalar_one_or_none()
+    
+    if not global_super_admin:
+        raise HTTPException(
+            status_code=403, detail="Super Admin role required"
+        )
+    return global_super_admin
+
+
 def buyer_group_id(claims: dict) -> UUID:
     return UUID(claims["sub"])
 

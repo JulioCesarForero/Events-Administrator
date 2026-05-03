@@ -67,6 +67,7 @@ export const StaffDashboard = () => {
   }
 
   const isAdmin = ['ADMIN', 'OWNER', 'TENANT_ADMIN', 'SUPER_ADMIN'].includes(session.role || '');
+  const isSuperAdmin = session.role === 'SUPER_ADMIN';
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -87,6 +88,14 @@ export const StaffDashboard = () => {
               Gestión de Staff
             </Button>
           )}
+          {isSuperAdmin && (
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/staff/admin/system-users')}
+            >
+              Gestión de Sistema
+            </Button>
+          )}
           <Button variant="outline" onClick={logout}>Cerrar Sesión</Button>
         </div>
       </div>
@@ -101,25 +110,28 @@ export const StaffDashboard = () => {
         {events.map(ev => {
           const userAssignment = session.eventAssignments?.find(a => a.eventId === ev.id);
           const eventRole = userAssignment?.role || session.role;
-          const isPaymentStaff = eventRole === 'EVENT_PAYMENT_STAFF' || eventRole === 'EVENT_SUPPORT_STAFF';
-          const isViewer = eventRole === 'EVENT_STUDENT_VIEWER' || eventRole === 'EVENT_SUPPORT_STAFF';
-          const isSupport = eventRole === 'EVENT_SUPPORT_STAFF';
+          const isPaymentStaff = ['CASHIER', 'ORGANIZER', 'COORDINATOR'].includes(eventRole || '');
+          const isViewer = ['REVIEWER', 'ORGANIZER', 'COORDINATOR', 'CASHIER'].includes(eventRole || '');
+          const isOrganizer = ['ORGANIZER', 'COORDINATOR'].includes(eventRole || '');
           
           return (
           <GlassCard key={ev.id} hoverEffect style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h4 style={{ fontSize: '1.2rem', margin: 0 }}>{ev.name}</h4>
             <p style={{ color: 'var(--text-secondary)' }}>Fecha: {ev.date}</p>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-               {(isAdmin || isPaymentStaff || isViewer || isSupport) && (
+               {(isAdmin || isPaymentStaff || isViewer) && (
                  <Button size="sm" onClick={() => navigate(`/staff/events/${ev.id}/payments`)}>Revisión Pagos</Button>
                )}
-               {(isAdmin || isPaymentStaff || isViewer || isSupport) && (
+               {(isAdmin || isPaymentStaff || isViewer) && (
                  <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/students`)}>Estudiantes</Button>
+               )}
+               
+               {(isAdmin || isOrganizer) && (
+                 <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/map`)}>Diseño de Plano</Button>
                )}
                
                {isAdmin && (
                  <>
-                   <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/map`)}>Diseño de Plano</Button>
                    <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/policies`)}>Políticas</Button>
                    <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/manual-adjustments`)}>Ajustes</Button>
                    <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/audit`)}>Auditoría</Button>

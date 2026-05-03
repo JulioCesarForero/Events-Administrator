@@ -359,3 +359,128 @@ firebase deploy --only hosting
 | `MODULE_NOT_FOUND` en Cloud Run | `.gcloudignore` excluye archivos necesarios | Revisar qué se excluye |
 
 
+---
+
+Listed directory backend-api
+Searched for "FastAPI"
+Viewed main.py:1-222
+Viewed settings.py:1-74
+Viewed env.prod.yaml:1-22
+Listed directory Events-Administrator
+Viewed firebase.json:1-58
+
+Dado que el backend de la aplicación está construido con **FastAPI**, el contrato de las APIs, sus métodos y la definición completa de los servicios se **genera automáticamente** basándose en el código fuente.
+
+Puedes encontrar y consultar esta definición de dos maneras:
+
+### 1. Documentación Interactiva en Producción (GCP / Firebase)
+Debido a que tu entorno de producción (`env.prod.yaml`) tiene la variable `DEBUG: 'true'` y las peticiones que empiezan con `/api` están siendo redirigidas al backend en Cloud Run, puedes acceder directamente a los contratos y probar las APIs en las siguientes URLs:
+
+* **Swagger UI (Recomendado - Interactivo):**
+  👉 [https://events-admin-prod-2026.web.app/api/docs](https://events-admin-prod-2026.web.app/api/docs)
+  *Aquí podrás ver todos los endpoints, el formato de las peticiones (body, headers, query params), los esquemas de respuesta y probar las llamadas directamente.*
+
+* **ReDoc (Alternativa de sólo lectura):**
+  👉 [https://events-admin-prod-2026.web.app/api/redoc](https://events-admin-prod-2026.web.app/api/redoc)
+
+* **Archivo JSON de la especificación (OpenAPI):**
+  👉 [https://events-admin-prod-2026.web.app/api/openapi.json](https://events-admin-prod-2026.web.app/api/openapi.json)
+
+---
+
+### 2. A nivel del Código Fuente (Localmente)
+Si deseas revisar la implementación y definición de las firmas directamente en el código de tu proyecto, los contratos están estructurados en el backend:
+
+* **Punto de ensamblaje principal:** `backend-api/app/main.py`. Aquí es donde todos los servicios se unen bajo la instancia de FastAPI y se define la estructura raíz (el prefijo `/v1/` para los servicios, entre otros).
+* **Rutas y métodos (Endpoints):** Están divididos por dominio en la carpeta `backend-api/modules/`. Por ejemplo:
+  * `/backend-api/modules/system_admin/api/router.py` (Administración del sistema).
+  * `/backend-api/modules/staff_admin/api/router.py` (Administración de staff).
+  * `/backend-api/modules/events/api/router.py` (Gestión de eventos).
+  
+Dentro de cada archivo `router.py`, las firmas de los métodos están definidas por las etiquetas como `@router.get(...)`, `@router.post(...)`, junto con sus modelos en Pydantic que determinan exactamente qué parámetros y qué payloads (contratos) espera recibir la API y cuáles va a devolver.
+
+
+---
+
+gcloud run deploy events-backend --source ./backend-api --region us-central1
+
+
+
+
+
+---
+
+
+firebase hosting:sites:create events-admin-prod-2026 --project events-admin-prod-2026
+
+
+firebase target:apply hosting main events-admin-prod-2026 --project events-admin-prod-2026
+firebase deploy --only hosting:main --project events-admin-prod-2026
+
+---
+
+Deploy frontend to Firebase
+
+cd C:\ProyectosIA\Events-Administrator\frontend
+
+npm run build
+
+firebase deploy --only hosting --project events-admin-prod-2026
+
+---
+
+Deploy Backend to Run Function 
+
+gcloud run deploy events-backend --source . --region us-central1
+
+
+---
+
+gcloud run services update events-backend `
+  --region us-central1 `
+  --set-env-vars GCS_BUCKET_NAME=event_bucket_evidence,GCS_UPLOAD_URL_TTL_SECONDS=900,GCS_DOWNLOAD_URL_TTL_SECONDS=600,GCS_MAX_UPLOAD_SIZE_BYTES=5242880,GCS_ALLOWED_MIME_EVIDENCE=image/jpeg,image/png,image/webp,application/pdf
+
+
+
+----
+
+
+PS C:\ProyectosIA\Events-Administrator\backend-api> gcloud run services describe events-backend --region us-central1 --format="yaml(spec.template.spec.containers[0].env)"
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: DATABASE_URL
+          value: postgresql+psycopg://neondb_owner:npg_7zLsBAh2IYZM@ep-little-hall-an1bxsxh.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require
+        - name: JWT_SECRET
+          value: btFLRjE_xInnNWao0Q_-P8kxjkV_uHrbGEUTx-azl9vy_fQEJJi-PBAzkcXIPrki
+        - name: JWT_ISSUER
+          value: events-administrator
+        - name: JWT_STAFF_AUDIENCE
+          value: staff
+        - name: JWT_BUYER_AUDIENCE
+          value: buyer
+        - name: JWT_ACCESS_TTL_MINUTES
+          value: '60'
+        - name: ROOT_PATH
+          value: /api
+        - name: DEBUG
+          value: 'true'
+        - name: CORS_ORIGINS
+          value: '*'
+        - name: LOG_LEVEL
+          value: INFO
+        - name: REDIS_URL
+        - name: IDEMPOTENCY_TTL_SECONDS
+          value: '3600'
+
+
+---
+
+PS C:\ProyectosIA\Events-Administrator\backend-api> gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=events-backend AND severity>=ERROR"                
+>>   --freshness=10m `
+>>   --limit=50 `
+>>   --format="table(timestamp,resource.labels.revision_name,httpRequest.requestUrl,textPayload)"
+
+

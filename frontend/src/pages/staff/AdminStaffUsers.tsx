@@ -32,7 +32,7 @@ const DEFAULT_FORM: CreateForm = {
   role: 'STAFF',
 };
 
-const TENANT_ROLES = ['ADMIN', 'STAFF'];
+const TENANT_ROLES = ['TENANT_ADMIN', 'STAFF'];
 
 export const AdminStaffUsers = () => {
   const { session } = useAuthStaff();

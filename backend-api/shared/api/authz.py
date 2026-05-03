@@ -10,6 +10,7 @@ class Permission(str, Enum):
     MANAGE_LAYOUTS = "manage:layouts"
 
 ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
+    # Tenant / System Roles
     "SUPER_ADMIN": {
         Permission.MANAGE_TENANT,
         Permission.MANAGE_EVENT,
@@ -39,15 +40,26 @@ ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
         Permission.MANAGE_STUDENTS,
         Permission.MANAGE_LAYOUTS,
     },
-    "EVENT_SUPPORT_STAFF": {
+    
+    # Event-Level Roles
+    "ORGANIZER": {
+        Permission.MANAGE_EVENT,
+        Permission.MANAGE_PAYMENTS,
+        Permission.VIEW_STUDENTS,
+        Permission.MANAGE_STUDENTS,
+        Permission.MANAGE_LAYOUTS,
+    },
+    "COORDINATOR": {
+        Permission.MANAGE_PAYMENTS,
+        Permission.VIEW_STUDENTS,
+        Permission.MANAGE_STUDENTS,
+        Permission.MANAGE_LAYOUTS,
+    },
+    "CASHIER": {
         Permission.MANAGE_PAYMENTS,
         Permission.VIEW_STUDENTS,
     },
-    "EVENT_PAYMENT_STAFF": {
-        Permission.MANAGE_PAYMENTS,
-        Permission.VIEW_STUDENTS, # Usually payment staff needs to see students to verify
-    },
-    "EVENT_STUDENT_VIEWER": {
+    "REVIEWER": {
         Permission.VIEW_STUDENTS,
     }
 }

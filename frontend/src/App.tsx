@@ -24,6 +24,7 @@ import { StaffManualAdjustments } from './pages/staff/StaffManualAdjustments';
 import { StaffAudit } from './pages/staff/StaffAudit';
 import { AdminStaffUsers } from './pages/staff/AdminStaffUsers';
 import { AdminEventStaff } from './pages/staff/AdminEventStaff';
+import { SystemUsers } from './pages/admin/SystemUsers';
 import {
   RequireBuyerAuth,
   RequireStaffAuth,
@@ -261,6 +262,14 @@ export default function App() {
                     <RequireTenantAdmin>
                       <AdminEventStaff />
                     </RequireTenantAdmin>
+                  </RequireStaffAuth>
+                }
+              />
+              <Route
+                path="admin/system-users"
+                element={
+                  <RequireStaffAuth>
+                    <SystemUsers />
                   </RequireStaffAuth>
                 }
               />
