@@ -1,8 +1,7 @@
 import logging
 import re
-from uuid import UUID
-
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import AfterValidator, Field
@@ -45,6 +44,7 @@ Email = Annotated[str, AfterValidator(_check_email)]
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
+
 
 class StaffLoginRequest(CamelModel):
     email: Email
@@ -113,6 +113,7 @@ class StaffMeResponse(CamelModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.post("/staff-login", response_model=StaffLoginResponse)
 def post_staff_login(body: StaffLoginRequest, db: DbSession) -> StaffLoginResponse:
     r = staff_login(db, body.email, body.password)
@@ -143,9 +144,7 @@ def _slugify(name: str) -> str:
 
 
 @router.post("/staff-register", response_model=StaffRegisterResponse)
-def post_staff_register(
-    body: StaffRegisterRequest, db: DbSession
-) -> StaffRegisterResponse:
+def post_staff_register(body: StaffRegisterRequest, db: DbSession) -> StaffRegisterResponse:
     if not settings.debug:
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -197,7 +196,8 @@ def post_staff_register(
     )
 
 
-from infrastructure.persistence.models import EventOrganizerAssignment, Event
+from infrastructure.persistence.models import Event, EventOrganizerAssignment
+
 
 @router.get("/me", response_model=StaffMeResponse)
 def get_me(staff: StaffUserDep, db: DbSession) -> StaffMeResponse:

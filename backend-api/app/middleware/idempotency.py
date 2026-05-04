@@ -18,8 +18,9 @@ import hashlib
 import json
 import time
 from collections import OrderedDict
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Protocol
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -152,7 +153,7 @@ def _match_route(path: str) -> IdempotentRoute | None:
                 continue
             if all(
                 p == s or (p.startswith("{") and p.endswith("}"))
-                for p, s in zip(pat_segments, segments)
+                for p, s in zip(pat_segments, segments, strict=False)
             ):
                 return rule
     return None
@@ -189,9 +190,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
       is the header when present; otherwise a business-derived hash.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.method != "POST":
             return await call_next(request)
 

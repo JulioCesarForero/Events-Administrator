@@ -3,11 +3,11 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter
-from shared.api.schemas import CamelOrmModel
 from sqlalchemy import select
 
 from infrastructure.persistence.models import AuditLog
 from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
+from shared.api.schemas import CamelOrmModel
 
 router = APIRouter(tags=["audit"])
 

@@ -21,7 +21,6 @@ from domain.error_codes import (
     UNAUTHENTICATED,
 )
 from domain.exceptions import DomainError
-from shared.exceptions.http_map import domain_error_to_status
 from modules.attendees.api.router import router as attendees_router
 from modules.audit.api.router import router as audit_router
 from modules.auth.api.router import router as auth_router
@@ -33,12 +32,13 @@ from modules.operations.api.router import router as operations_router
 from modules.payments.api.router import router as payments_router
 from modules.reservations.api.router import router as reservations_router
 from modules.staff_admin.api.router import router as staff_admin_router
-from modules.system_admin.api.router import router as system_admin_router
 from modules.students.api.router import router as students_router
+from modules.system_admin.api.router import router as system_admin_router
 from modules.venues.api.router import router as venues_router
 from modules.venues.api.tables_router import router as layout_tables_router
 from shared.api.responses import problem_response
 from shared.api.storage_router import router as storage_router
+from shared.exceptions.http_map import domain_error_to_status
 
 
 def create_app() -> FastAPI:
@@ -123,9 +123,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=status, content=body, headers=headers)
 
     @app.exception_handler(RequestValidationError)
-    async def _validation_handler(
-        request: Request, exc: RequestValidationError
-    ) -> JSONResponse:
+    async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         rid = getattr(request.state, "request_id", None)
         errors = exc.errors()
         first = errors[0] if errors else None

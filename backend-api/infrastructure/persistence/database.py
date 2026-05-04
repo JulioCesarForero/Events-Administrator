@@ -5,7 +5,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from config.settings import settings
-from infrastructure.persistence.base import Base
 
 _engine = None
 _session_factory: sessionmaker[Session] | None = None
@@ -20,10 +19,7 @@ def get_engine():
             pool_size=60,
             max_overflow=40,
             pool_recycle=1800,
-            connect_args={
-                'connect_timeout': 10,
-                'options': '-c statement_timeout=30000'
-            },
+            connect_args={"connect_timeout": 10, "options": "-c statement_timeout=30000"},
             echo=settings.debug,
         )
         _session_factory = sessionmaker(

@@ -5,6 +5,7 @@ is intentionally unauthenticated so that the buyer can read the Política de
 tratamiento de datos and Términos y condiciones both before and after
 logging in. These tests override the DB dependency to keep them hermetic.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

@@ -34,9 +34,7 @@ class Settings(BaseSettings):
     # Idempotency store. Leave empty for in-memory (MVP); set to a Redis URL in
     # production to share the cache across replicas.
     redis_url: str = Field(default="", validation_alias="REDIS_URL")
-    idempotency_ttl_seconds: int = Field(
-        default=3600, validation_alias="IDEMPOTENCY_TTL_SECONDS"
-    )
+    idempotency_ttl_seconds: int = Field(default=3600, validation_alias="IDEMPOTENCY_TTL_SECONDS")
 
     gcs_bucket_name: str = Field(
         default="event_bucket_evidence", validation_alias="GCS_BUCKET_NAME"

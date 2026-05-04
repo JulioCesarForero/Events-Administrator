@@ -1,7 +1,5 @@
 """Unit tests for camelCase serialization."""
 
-from uuid import uuid4
-
 from shared.api.schemas import CamelModel, CamelOrmModel
 
 

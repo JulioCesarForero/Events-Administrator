@@ -1,17 +1,15 @@
-from uuid import UUID
-from urllib.parse import unquote, urlparse
 import unicodedata
+from urllib.parse import unquote, urlparse
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
-
-from shared.api.schemas import CamelModel, CamelOrmModel
-from sqlalchemy import select
 
 from domain.error_codes import INVALID_PAYLOAD
 from domain.exceptions import ValidationError
 from infrastructure.persistence.models import StudentImportBatch, StudentRecord
 from shared.api.deps import DbSession, StaffUserDep, ensure_event_student_manager_access
+from shared.api.schemas import CamelModel, CamelOrmModel
 
 REQUIRED_IMPORT_COLUMNS = {"codigo_unico", "apellidos", "nombres"}
 
@@ -48,7 +46,9 @@ def create_import(
 ) -> ImportCreateResponse:
     import csv
     import io
+
     from google.cloud import storage
+
     from config.settings import settings
 
     def _normalize_header(value: str) -> str:
@@ -59,7 +59,7 @@ def create_import(
         return raw
 
     ensure_event_student_manager_access(db, staff, event_id)
-    
+
     # Pre-validate columns if provided in the request
     if body.expected_columns is not None:
         provided = {c.strip().lower() for c in body.expected_columns}
@@ -109,10 +109,10 @@ def create_import(
             storage_client = storage.Client()
             bucket = storage_client.bucket(bucket_name)
             blob = bucket.blob(object_key)
-            
+
             content = blob.download_as_text()
             f = io.StringIO(content)
-            
+
             # Detect delimiter (fallback to ';' or ',').
             sample = content[:2048]
             try:
@@ -122,16 +122,14 @@ def create_import(
                 first_line = content.splitlines()[0] if content else ""
                 delimiter = ";" if ";" in first_line else ","
             reader = csv.DictReader(f, delimiter=delimiter)
-            
+
             # Normalize headers (BOM, accents, spaces).
             reader.fieldnames = [_normalize_header(fn) for fn in (reader.fieldnames or [])]
             expected = {_normalize_header(c) for c in REQUIRED_IMPORT_COLUMNS}
             present = set(reader.fieldnames or [])
             if not expected.issubset(present):
-                raise ValueError(
-                    "CSV headers must include codigo_unico, apellidos, nombres"
-                )
-            
+                raise ValueError("CSV headers must include codigo_unico, apellidos, nombres")
+
             for row in reader:
                 student_code = (row.get("codigo_unico") or row.get("codigo") or "").strip()
                 first_name = (row.get("nombres") or row.get("nombre") or "").strip()
@@ -152,7 +150,7 @@ def create_import(
 
     total = len(rows_to_process)
     imported = 0
-    
+
     if rows_to_process:
         for row in rows_to_process:
             if not row.student_code:
@@ -167,7 +165,7 @@ def create_import(
                 )
             )
             imported += 1
-        
+
         batch.total_rows = total
         batch.imported_rows = imported
         batch.failed_rows = total - imported
@@ -182,7 +180,7 @@ def create_import(
                 "Expected headers: codigo_unico, apellidos, nombres"
             ),
         )
-        
+
     db.flush()
     return ImportCreateResponse(batch_id=batch.id, status=batch.status)
 

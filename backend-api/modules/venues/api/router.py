@@ -2,13 +2,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
-
-from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from infrastructure.persistence.models import Layout, UserTenantMembership, Venue
 from shared.api.deps import DbSession, StaffUserDep
+from shared.api.schemas import CamelModel, CamelOrmModel
 
 router = APIRouter(prefix="/venues", tags=["venues"])
 
@@ -88,9 +87,7 @@ def list_layouts(venue_id: UUID, db: DbSession, staff: StaffUserDep) -> list[Lay
 
 
 @router.post("/{venue_id}/layouts", response_model=LayoutOut)
-def create_layout(
-    venue_id: UUID, body: LayoutCreate, db: DbSession, staff: StaffUserDep
-) -> Layout:
+def create_layout(venue_id: UUID, body: LayoutCreate, db: DbSession, staff: StaffUserDep) -> Layout:
     venue = db.get(Venue, venue_id)
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
@@ -99,5 +96,3 @@ def create_layout(
     db.add(lo)
     db.flush()
     return lo
-
-

@@ -1,4 +1,5 @@
 """Integration tests for GET /v1/payments/{id}/evidences (staff only)."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -38,9 +39,7 @@ def test_list_evidences_returns_rows() -> None:
     payment_id = uuid4()
     staff = SimpleNamespace(id=uuid4())
 
-    payment = SimpleNamespace(
-        id=payment_id, event_id=event_id, tenant_id=uuid4()
-    )
+    payment = SimpleNamespace(id=payment_id, event_id=event_id, tenant_id=uuid4())
     event = SimpleNamespace(id=event_id, tenant_id=payment.tenant_id)
 
     def fake_get(model, key):

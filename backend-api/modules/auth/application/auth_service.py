@@ -75,9 +75,7 @@ def code_login(db: Session, event_id: UUID, student_code: str) -> CodeLoginResul
             group.code_consumed_at = now
             is_first = True
 
-    token = create_buyer_token(
-        group_id=group.id, event_id=event_id, student_code=student_code
-    )
+    token = create_buyer_token(group_id=group.id, event_id=event_id, student_code=student_code)
     return CodeLoginResult(
         access_token=token,
         event_id=event_id,

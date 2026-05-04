@@ -44,4 +44,3 @@ def missing_required_columns(session: Session) -> list[str]:
         if key not in found:
             missing.append(".".join(key))
     return missing
-

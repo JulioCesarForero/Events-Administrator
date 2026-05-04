@@ -1,7 +1,5 @@
 """Unit tests for reservation domain rules."""
 
-import pytest
-
 from domain.error_codes import (
     PAYMENT_NOT_APPROVED,
     RESERVATION_EXCEEDS_APPROVED_TICKETS,

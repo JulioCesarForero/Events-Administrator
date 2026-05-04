@@ -5,8 +5,8 @@ with a Redis-backed sliding window (e.g. `redis.call('ZADD', ...)`).
 """
 
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -26,9 +26,7 @@ class RateLimitRule:
     window_seconds: int
 
     def matches(self, method: str, path: str) -> bool:
-        return method == "POST" and path.rstrip("/").endswith(
-            self.path_prefix.rstrip("/")
-        )
+        return method == "POST" and path.rstrip("/").endswith(self.path_prefix.rstrip("/"))
 
 
 DEFAULT_RULES: tuple[RateLimitRule, ...] = (
@@ -57,9 +55,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 return idx, rule
         return None
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         match = self._rule_for(request)
         if match is None:
             return await call_next(request)
@@ -83,9 +79,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             body = problem_response(
                 status=429,
                 title="RATE_LIMITED",
-                detail=(
-                    f"Demasiados intentos. Intenta de nuevo en {retry_after}s."
-                ),
+                detail=(f"Demasiados intentos. Intenta de nuevo en {retry_after}s."),
                 code=UNAUTHENTICATED,
                 correlation_id=rid,
             )

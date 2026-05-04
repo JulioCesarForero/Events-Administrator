@@ -1,4 +1,5 @@
 """Unit tests for the tenant-admin helper used by the staff-admin router."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -25,9 +26,7 @@ def test_ensure_tenant_admin_rejects_user_without_membership():
 
 def test_ensure_tenant_admin_rejects_non_admin_role():
     db = MagicMock()
-    db.execute.return_value.scalar_one_or_none.return_value = SimpleNamespace(
-        role="STAFF"
-    )
+    db.execute.return_value.scalar_one_or_none.return_value = SimpleNamespace(role="STAFF")
     with pytest.raises(HTTPException) as exc:
         ensure_tenant_admin(db, _fake_staff(), uuid4())
     assert exc.value.status_code == 403

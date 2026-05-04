@@ -170,7 +170,9 @@ class LayoutTable(Base):
 class Event(Base):
     __tablename__ = "event"
     __table_args__ = (
-        CheckConstraint("status IN ('DRAFT','PREPARING','OPEN','CLOSED','ARCHIVED')", name="ck_event_status"),
+        CheckConstraint(
+            "status IN ('DRAFT','PREPARING','OPEN','CLOSED','ARCHIVED')", name="ck_event_status"
+        ),
         SCHEMA,
     )
 
@@ -248,7 +250,9 @@ class EventLayoutBinding(Base):
 class EventPolicyDocument(Base):
     __tablename__ = "event_policy_document"
     __table_args__ = (
-        UniqueConstraint("event_id", "document_type", "version_label", name="uq_policy_event_type_version"),
+        UniqueConstraint(
+            "event_id", "document_type", "version_label", name="uq_policy_event_type_version"
+        ),
         CheckConstraint("status IN ('DRAFT','PUBLISHED','ARCHIVED')", name="ck_policy_status"),
         CheckConstraint("document_type IN ('DATA_POLICY','EVENT_TERMS')", name="ck_policy_type"),
         SCHEMA,
@@ -363,7 +367,9 @@ class StudentRecord(Base):
 class AttendeeGroup(Base):
     __tablename__ = "attendee_group"
     __table_args__ = (
-        UniqueConstraint("event_id", "student_record_id", name="uq_attendee_group_event_student_record"),
+        UniqueConstraint(
+            "event_id", "student_record_id", name="uq_attendee_group_event_student_record"
+        ),
         CheckConstraint(
             "reservation_status IN ('NONE','PENDING','CONFIRMED','RELEASED','ADJUSTED')",
             name="ck_ag_reservation_status",
@@ -380,7 +386,9 @@ class AttendeeGroup(Base):
     )
     student_code_snapshot: Mapped[str] = mapped_column(String(128))
     display_name: Mapped[str | None] = mapped_column(String(400), nullable=True)
-    code_consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    code_consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     current_payment_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("events.payment.id", ondelete="SET NULL"), nullable=True
     )
@@ -482,7 +490,9 @@ class PaymentEvidence(Base):
 class Reservation(Base):
     __tablename__ = "reservation"
     __table_args__ = (
-        CheckConstraint("status IN ('CONFIRMED','RELEASED','ADJUSTED')", name="ck_reservation_status"),
+        CheckConstraint(
+            "status IN ('CONFIRMED','RELEASED','ADJUSTED')", name="ck_reservation_status"
+        ),
         SCHEMA,
     )
 
@@ -504,8 +514,12 @@ class Reservation(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     table_reservations: Mapped[list[TableReservation]] = relationship(back_populates="reservation")
-    code_assignments: Mapped[list[ReservationCodeAssignment]] = relationship(back_populates="reservation")
-    consent: Mapped[ReservationConsent | None] = relationship(back_populates="reservation", uselist=False)
+    code_assignments: Mapped[list[ReservationCodeAssignment]] = relationship(
+        back_populates="reservation"
+    )
+    consent: Mapped[ReservationConsent | None] = relationship(
+        back_populates="reservation", uselist=False
+    )
 
 
 class TableReservation(Base):
@@ -534,7 +548,9 @@ class TableReservation(Base):
     )
     spots_reserved: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(32), default="ACTIVE")
-    reserved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    reserved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     created_by_actor_type: Mapped[str] = mapped_column(String(32), default="BUYER")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -593,7 +609,9 @@ class ReservationConsent(Base):
     accepted_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("events.staff_user.id", ondelete="SET NULL"), nullable=True
     )
-    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    accepted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     policy_version_label: Mapped[str] = mapped_column(String(64))
     terms_version_label: Mapped[str] = mapped_column(String(64))
 
@@ -619,5 +637,7 @@ class AuditLog(Base):
     entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     action: Mapped[str] = mapped_column(String(128))
     payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     correlation_id: Mapped[str | None] = mapped_column(String(64), nullable=True)

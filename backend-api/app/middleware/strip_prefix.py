@@ -26,10 +26,10 @@ class StripPrefixMiddleware:
         if scope["type"] in ("http", "websocket") and self.prefix:
             path: str = scope.get("path", "")
             if path == self.prefix or path.startswith(self.prefix + "/"):
-                scope["path"] = path[len(self.prefix):] or "/"
+                scope["path"] = path[len(self.prefix) :] or "/"
                 raw_path = scope.get("raw_path")
                 if isinstance(raw_path, bytes):
                     prefix_bytes = self.prefix.encode()
                     if raw_path.startswith(prefix_bytes):
-                        scope["raw_path"] = raw_path[len(prefix_bytes):] or b"/"
+                        scope["raw_path"] = raw_path[len(prefix_bytes) :] or b"/"
         await self.app(scope, receive, send)

@@ -4,6 +4,7 @@ Endpoints are gated by ``ensure_tenant_admin`` which requires the authenticated
 StaffUser to have a ``UserTenantMembership`` with role ``ADMIN`` or ``OWNER``
 on the target tenant.
 """
+
 from __future__ import annotations
 
 import re
@@ -94,9 +95,7 @@ class StaffAssignmentOut(CamelOrmModel):
 # ---------------------------------------------------------------------------
 
 
-def _serialize_user(
-    user: StaffUser, role: str | None, assignments_count: int
-) -> StaffUserOut:
+def _serialize_user(user: StaffUser, role: str | None, assignments_count: int) -> StaffUserOut:
     return StaffUserOut(
         id=user.id,
         email=user.email,
@@ -142,8 +141,7 @@ def list_tenant_staff_users(
         counts = {uid: int(n) for uid, n in count_rows}
 
     return [
-        _serialize_user(user, membership.role, counts.get(user.id, 0))
-        for user, membership in rows
+        _serialize_user(user, membership.role, counts.get(user.id, 0)) for user, membership in rows
     ]
 
 
@@ -219,11 +217,15 @@ def patch_staff_user(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    membership = db.execute(
-        select(UserTenantMembership).where(
-            UserTenantMembership.user_id == user_id,
+    membership = (
+        db.execute(
+            select(UserTenantMembership).where(
+                UserTenantMembership.user_id == user_id,
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if membership is None:
         raise HTTPException(status_code=404, detail="User has no tenant")
     ensure_tenant_admin(db, staff, membership.tenant_id)
@@ -335,9 +337,7 @@ def assign_event_staff(
         )
     ).scalar_one_or_none()
     if existing is not None:
-        raise HTTPException(
-            status_code=409, detail="Staff user already assigned to event"
-        )
+        raise HTTPException(status_code=409, detail="Staff user already assigned to event")
 
     assignment = EventOrganizerAssignment(
         event_id=event_id,

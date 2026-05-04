@@ -2,14 +2,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
-
-from shared.api.schemas import CamelModel, CamelOrmModel
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from infrastructure.persistence.models import Layout, LayoutTable, UserTenantMembership, Venue, Zone
 from shared.api.deps import DbSession, StaffUserDep
+from shared.api.schemas import CamelModel, CamelOrmModel
 
 router = APIRouter(prefix="/layouts", tags=["layouts"])
 
@@ -63,9 +62,7 @@ class TableOut(CamelOrmModel):
 def list_tables(layout_id: UUID, db: DbSession, staff: StaffUserDep) -> list[LayoutTable]:
     tid = _layout_tenant(db, layout_id)
     _ensure_tenant_staff(db, staff.id, tid)
-    return list(
-        db.execute(select(LayoutTable).where(LayoutTable.layout_id == layout_id)).scalars()
-    )
+    return list(db.execute(select(LayoutTable).where(LayoutTable.layout_id == layout_id)).scalars())
 
 
 @router.post("/{layout_id}/tables", response_model=TableOut)
@@ -92,9 +89,13 @@ def create_table(
     except IntegrityError as exc:
         msg = str(exc.orig).lower() if exc.orig is not None else str(exc).lower()
         if "uq_layout_table_layout_code" in msg:
-            raise HTTPException(status_code=409, detail="Table code already exists in this layout") from exc
+            raise HTTPException(
+                status_code=409, detail="Table code already exists in this layout"
+            ) from exc
         if "ck_layout_table_capacity" in msg:
-            raise HTTPException(status_code=400, detail="tableCapacityLimit must be greater than 0") from exc
+            raise HTTPException(
+                status_code=400, detail="tableCapacityLimit must be greater than 0"
+            ) from exc
         raise HTTPException(status_code=400, detail="Invalid table data for layout") from exc
     return t
 
@@ -105,11 +106,11 @@ def update_table(
 ) -> LayoutTable:
     tid = _layout_tenant(db, layout_id)
     _ensure_tenant_staff(db, staff.id, tid)
-    
+
     t = db.get(LayoutTable, table_id)
     if t is None or t.layout_id != layout_id:
         raise HTTPException(status_code=404, detail="Table not found in layout")
-        
+
     if body.code is not None:
         t.code = body.code
     if body.table_capacity_limit is not None:
@@ -121,29 +122,31 @@ def update_table(
         t.position_json = body.position_json
     if body.is_public_selectable is not None:
         t.is_public_selectable = body.is_public_selectable
-        
+
     try:
         db.flush()
     except IntegrityError as exc:
         msg = str(exc.orig).lower() if exc.orig is not None else str(exc).lower()
         if "uq_layout_table_layout_code" in msg:
-            raise HTTPException(status_code=409, detail="Table code already exists in this layout") from exc
+            raise HTTPException(
+                status_code=409, detail="Table code already exists in this layout"
+            ) from exc
         if "ck_layout_table_capacity" in msg:
-            raise HTTPException(status_code=400, detail="tableCapacityLimit must be greater than 0") from exc
+            raise HTTPException(
+                status_code=400, detail="tableCapacityLimit must be greater than 0"
+            ) from exc
         raise HTTPException(status_code=400, detail="Invalid table update for layout") from exc
     return t
 
 
 @router.delete("/{layout_id}/tables/{table_id}", status_code=204)
-def delete_table(
-    layout_id: UUID, table_id: UUID, db: DbSession, staff: StaffUserDep
-) -> None:
+def delete_table(layout_id: UUID, table_id: UUID, db: DbSession, staff: StaffUserDep) -> None:
     tid = _layout_tenant(db, layout_id)
     _ensure_tenant_staff(db, staff.id, tid)
-    
+
     t = db.get(LayoutTable, table_id)
     if t is None or t.layout_id != layout_id:
         raise HTTPException(status_code=404, detail="Table not found in layout")
-        
+
     db.delete(t)
     db.flush()

@@ -9,9 +9,12 @@ def test_storage_download_url_with_storage_path() -> None:
     from app.main import app
 
     client = TestClient(app)
-    with patch("shared.api.storage_router.decode_token", return_value={"sub": "u1"}), patch(
-        "shared.api.storage_router.generate_download_url",
-        return_value="https://signed.example.com/file",
+    with (
+        patch("shared.api.storage_router.decode_token", return_value={"sub": "u1"}),
+        patch(
+            "shared.api.storage_router.generate_download_url",
+            return_value="https://signed.example.com/file",
+        ),
     ):
         response = client.post(
             "/v1/storage/download-url",

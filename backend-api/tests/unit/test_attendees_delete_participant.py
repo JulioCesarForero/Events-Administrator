@@ -33,7 +33,9 @@ def test_delete_participant_success(monkeypatch) -> None:
     fake_event = SimpleNamespace(id=fake_group.event_id, event_date=None)
 
     monkeypatch.setattr(attendees_router, "_can_access_group", lambda *_args, **_kwargs: fake_group)
-    monkeypatch.setattr(attendees_router, "_load_event_for_group", lambda *_args, **_kwargs: fake_event)
+    monkeypatch.setattr(
+        attendees_router, "_load_event_for_group", lambda *_args, **_kwargs: fake_event
+    )
     monkeypatch.setattr(attendees_router, "_event_timezone", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         attendees_router,
@@ -60,7 +62,9 @@ def test_delete_participant_not_found_for_group(monkeypatch) -> None:
     fake_event = SimpleNamespace(id=fake_group.event_id, event_date=None)
 
     monkeypatch.setattr(attendees_router, "_can_access_group", lambda *_args, **_kwargs: fake_group)
-    monkeypatch.setattr(attendees_router, "_load_event_for_group", lambda *_args, **_kwargs: fake_event)
+    monkeypatch.setattr(
+        attendees_router, "_load_event_for_group", lambda *_args, **_kwargs: fake_event
+    )
     monkeypatch.setattr(attendees_router, "_event_timezone", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         attendees_router,

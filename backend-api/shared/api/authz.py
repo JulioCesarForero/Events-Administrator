@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set
+
 
 class Permission(str, Enum):
     MANAGE_TENANT = "manage:tenant"
@@ -9,7 +9,8 @@ class Permission(str, Enum):
     MANAGE_STUDENTS = "manage:students"
     MANAGE_LAYOUTS = "manage:layouts"
 
-ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
+
+ROLE_PERMISSIONS: dict[str, set[Permission]] = {
     # Tenant / System Roles
     "SUPER_ADMIN": {
         Permission.MANAGE_TENANT,
@@ -40,7 +41,6 @@ ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
         Permission.MANAGE_STUDENTS,
         Permission.MANAGE_LAYOUTS,
     },
-    
     # Event-Level Roles
     "ORGANIZER": {
         Permission.MANAGE_EVENT,
@@ -61,8 +61,9 @@ ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
     },
     "REVIEWER": {
         Permission.VIEW_STUDENTS,
-    }
+    },
 }
 
-def get_role_permissions(role: str) -> Set[Permission]:
+
+def get_role_permissions(role: str) -> set[Permission]:
     return ROLE_PERMISSIONS.get(role, set())

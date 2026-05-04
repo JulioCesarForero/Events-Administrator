@@ -6,8 +6,6 @@ from pydantic import AliasChoices, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from shared.api.schemas import CamelModel, CamelOrmModel
-
 from domain.error_codes import LEGAL_ACCEPTANCE_REQUIRED
 from domain.exceptions import ValidationError as DomainValidationError
 from infrastructure.persistence.models import (
@@ -23,6 +21,7 @@ from modules.reservations.application.reservation_service import (
     release_reservation,
 )
 from shared.api.deps import BuyerClaimsDep, DbSession, buyer_event_id, buyer_group_id
+from shared.api.schemas import CamelModel, CamelOrmModel
 
 router = APIRouter(tags=["reservations"])
 
@@ -228,9 +227,7 @@ def post_reservation(
         event_id=event_id,
         group_id=gid,
         payment_id=body.payment_id,
-        allocations=[
-            TableAllocation(a.layout_table_id, a.spots) for a in body.allocations
-        ],
+        allocations=[TableAllocation(a.layout_table_id, a.spots) for a in body.allocations],
         policy_document_id=body.legal_acceptance.policy_document_id,
         terms_document_id=body.legal_acceptance.terms_document_id,
     )
@@ -262,9 +259,7 @@ def post_move(
         reservation_id=reservation_id,
         group_id=buyer_group_id(claims),
         event_id=eid,
-        allocations=[
-            TableAllocation(a.layout_table_id, a.spots) for a in body.allocations
-        ],
+        allocations=[TableAllocation(a.layout_table_id, a.spots) for a in body.allocations],
     )
     res_out = _build_reservation_out(db, res, detailed_legal=detailed)
     return _serialize_reservation(res_out)

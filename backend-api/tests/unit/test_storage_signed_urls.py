@@ -6,7 +6,11 @@ import pytest
 
 from domain.exceptions import ValidationError
 from infrastructure.storage import signed_urls
-from infrastructure.storage.signed_urls import _storage_client, sanitize_filename, validate_upload_constraints
+from infrastructure.storage.signed_urls import (
+    _storage_client,
+    sanitize_filename,
+    validate_upload_constraints,
+)
 
 
 def test_sanitize_filename_removes_path_and_special_chars() -> None:
@@ -36,7 +40,9 @@ def test_validate_upload_constraints_rejects_excessive_size() -> None:
         )
 
 
-def test_storage_client_uses_impersonated_signing_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_storage_client_uses_impersonated_signing_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class FakeComputeCredentials:
         def __init__(self) -> None:
             self.service_account_email = "svc@example.iam.gserviceaccount.com"
@@ -52,7 +58,9 @@ def test_storage_client_uses_impersonated_signing_credentials(monkeypatch: pytes
 
     monkeypatch.setattr(signed_urls, "_auth_default", lambda: (fake_credentials, "project-1"))
     monkeypatch.setattr(signed_urls, "_auth_request", lambda: fake_request)
-    monkeypatch.setattr(signed_urls, "_build_signing_credentials", lambda _creds: fake_signing_credentials)
+    monkeypatch.setattr(
+        signed_urls, "_build_signing_credentials", lambda _creds: fake_signing_credentials
+    )
     monkeypatch.setattr(signed_urls, "_storage_client_factory", fake_storage_client)
 
     client, credentials = _storage_client()

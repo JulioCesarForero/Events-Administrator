@@ -3,8 +3,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
-
-from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,6 +16,7 @@ from infrastructure.persistence.models import (
     Venue,
 )
 from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
+from shared.api.schemas import CamelModel, CamelOrmModel
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -60,7 +59,9 @@ class EventOut(CamelOrmModel):
 def list_events(tenant_id: UUID, db: DbSession, staff: StaffUserDep) -> list[Event]:
     _ensure_tenant_staff(db, staff.id, tenant_id)
     return list(
-        db.execute(select(Event).where(Event.tenant_id == tenant_id).order_by(Event.event_date)).scalars()
+        db.execute(
+            select(Event).where(Event.tenant_id == tenant_id).order_by(Event.event_date)
+        ).scalars()
     )
 
 
@@ -85,9 +86,7 @@ def create_event(body: EventCreate, db: DbSession, staff: StaffUserDep) -> Event
     )
     db.add(ev)
     db.flush()
-    db.add(
-        EventOrganizerAssignment(event_id=ev.id, user_id=staff.id, role="ORGANIZER")
-    )
+    db.add(EventOrganizerAssignment(event_id=ev.id, user_id=staff.id, role="ORGANIZER"))
     return ev
 
 
@@ -183,9 +182,7 @@ def put_configuration(
         for attr, value in event_updates.items():
             setattr(ev, attr, value)
 
-    config_payload = {
-        k: v for k, v in body.model_dump().items() if k in _CONFIG_FIELDS
-    }
+    config_payload = {k: v for k, v in body.model_dump().items() if k in _CONFIG_FIELDS}
 
     existing = db.execute(
         select(EventConfiguration).where(EventConfiguration.event_id == event_id)
@@ -237,3 +234,41 @@ def bind_layout(
     db.add(b)
     db.flush()
     return b
+
+
+import base64
+import io
+
+import qrcode
+from fastapi.responses import JSONResponse
+
+
+@router.get("/{event_id}/qr")
+def generate_event_qr(
+    event_id: UUID,
+    frontend_url: str,
+    db: DbSession,
+    staff: StaffUserDep,
+) -> JSONResponse:
+    """
+    Generate a QR code for the given event portal login URL.
+    Only accessible by authorized staff.
+    """
+    ensure_event_staff_access(db, staff, event_id)
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_Q,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(frontend_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format="PNG")
+
+    base64_img = base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
+    return JSONResponse(content={"qrCode": f"data:image/png;base64,{base64_img}"})

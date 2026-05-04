@@ -64,7 +64,9 @@ BuyerClaimsDep = Annotated[dict, Depends(get_current_buyer)]
 from shared.api.authz import Permission, get_role_permissions
 
 
-def has_event_permission(db: Session, staff: StaffUser, event_id: UUID, permission: Permission) -> Event:
+def has_event_permission(
+    db: Session, staff: StaffUser, event_id: UUID, permission: Permission
+) -> Event:
     ev = db.get(Event, event_id)
     if ev is None:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -76,7 +78,7 @@ def has_event_permission(db: Session, staff: StaffUser, event_id: UUID, permissi
             EventOrganizerAssignment.user_id == staff.id,
         )
     ).scalar_one_or_none()
-    
+
     if org is not None:
         perms = get_role_permissions(org.role)
         if permission in perms:
@@ -89,13 +91,15 @@ def has_event_permission(db: Session, staff: StaffUser, event_id: UUID, permissi
             UserTenantMembership.tenant_id == ev.tenant_id,
         )
     ).scalar_one_or_none()
-    
+
     if m is not None:
         perms = get_role_permissions(m.role)
         if permission in perms:
             return ev
 
-    raise HTTPException(status_code=403, detail="Not allowed for this event or insufficient permissions")
+    raise HTTPException(
+        status_code=403, detail="Not allowed for this event or insufficient permissions"
+    )
 
 
 def ensure_event_staff_access(db: Session, staff: StaffUser, event_id: UUID) -> Event:
@@ -133,7 +137,10 @@ def ensure_event_viewer_access(db: DbSession, staff: StaffUserDep, event_id: UUI
 def ensure_event_manager_access(db: DbSession, staff: StaffUserDep, event_id: UUID) -> Event:
     return has_event_permission(db, staff, event_id, Permission.MANAGE_EVENT)
 
-def ensure_event_student_manager_access(db: DbSession, staff: StaffUserDep, event_id: UUID) -> Event:
+
+def ensure_event_student_manager_access(
+    db: DbSession, staff: StaffUserDep, event_id: UUID
+) -> Event:
     return has_event_permission(db, staff, event_id, Permission.MANAGE_STUDENTS)
 
 
@@ -150,7 +157,7 @@ def ensure_tenant_admin(
             UserTenantMembership.role == "SUPER_ADMIN",
         )
     ).scalar_one_or_none()
-    
+
     if global_super_admin:
         return global_super_admin
 
@@ -161,17 +168,13 @@ def ensure_tenant_admin(
             UserTenantMembership.tenant_id == tenant_id,
         )
     ).scalar_one_or_none()
-    
+
     if m is None or m.role not in TENANT_ADMIN_ROLES:
-        raise HTTPException(
-            status_code=403, detail="Tenant admin role required"
-        )
+        raise HTTPException(status_code=403, detail="Tenant admin role required")
     return m
 
 
-def ensure_super_admin(
-    db: Session, staff: StaffUser
-) -> UserTenantMembership:
+def ensure_super_admin(db: Session, staff: StaffUser) -> UserTenantMembership:
     # Check if the user is a SUPER_ADMIN anywhere (global super admin rights)
     global_super_admin = db.execute(
         select(UserTenantMembership).where(
@@ -179,11 +182,9 @@ def ensure_super_admin(
             UserTenantMembership.role == "SUPER_ADMIN",
         )
     ).scalar_one_or_none()
-    
+
     if not global_super_admin:
-        raise HTTPException(
-            status_code=403, detail="Super Admin role required"
-        )
+        raise HTTPException(status_code=403, detail="Super Admin role required")
     return global_super_admin
 
 

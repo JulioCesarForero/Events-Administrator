@@ -40,7 +40,11 @@ def _allowed_mime_for_purpose(purpose: str) -> set[str]:
         raw = settings.gcs_allowed_mime_import
     else:
         raw = ",".join(
-            [settings.gcs_allowed_mime_evidence, settings.gcs_allowed_mime_layout, settings.gcs_allowed_mime_import]
+            [
+                settings.gcs_allowed_mime_evidence,
+                settings.gcs_allowed_mime_layout,
+                settings.gcs_allowed_mime_import,
+            ]
         )
     return {m.strip().lower() for m in raw.split(",") if m.strip()}
 
@@ -57,7 +61,9 @@ def sanitize_filename(filename: str) -> str:
     return normalized[:180]
 
 
-def validate_upload_constraints(*, purpose: str, content_type: str, size_bytes: int | None = None) -> None:
+def validate_upload_constraints(
+    *, purpose: str, content_type: str, size_bytes: int | None = None
+) -> None:
     mime = (content_type or "application/octet-stream").lower().strip()
     allowed = _allowed_mime_for_purpose(purpose)
     if mime not in allowed:
@@ -72,7 +78,15 @@ def validate_upload_constraints(*, purpose: str, content_type: str, size_bytes: 
         )
 
 
-def build_object_ref(*, purpose: str, filename: str, tenant_id: str | None = None, event_id: str | None = None, payment_id: str | None = None, layout_id: str | None = None) -> ObjectRef:
+def build_object_ref(
+    *,
+    purpose: str,
+    filename: str,
+    tenant_id: str | None = None,
+    event_id: str | None = None,
+    payment_id: str | None = None,
+    layout_id: str | None = None,
+) -> ObjectRef:
     clean_name = sanitize_filename(filename)
     if purpose == "import":
         prefix = "imports"

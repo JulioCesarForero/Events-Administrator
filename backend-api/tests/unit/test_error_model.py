@@ -1,9 +1,7 @@
 """Unit tests for the error model and HTTP mapping."""
 
 from domain.error_codes import (
-    PAYMENT_NOT_APPROVED,
     TABLE_CAPACITY_CONFLICT,
-    UNAUTHENTICATED,
 )
 from domain.exceptions import (
     AuthenticationError,

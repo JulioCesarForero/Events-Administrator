@@ -1,24 +1,29 @@
+from typing import Annotated
+
 import jwt
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import Field, model_validator
-from shared.api.schemas import CamelModel
+
 from config.settings import settings
 from domain.exceptions import ValidationError
+from infrastructure.security.jwt_tokens import decode_token
 from infrastructure.storage.signed_urls import (
     build_object_ref,
     generate_download_url,
     generate_upload_url,
     validate_upload_constraints,
 )
-from infrastructure.security.jwt_tokens import decode_token
-from typing import Annotated
+from shared.api.schemas import CamelModel
 
 router = APIRouter(prefix="/storage", tags=["storage"])
 
 security_bearer = HTTPBearer(auto_error=False)
 
-def verify_any_token(creds: Annotated[HTTPAuthorizationCredentials | None, Depends(security_bearer)]) -> dict:
+
+def verify_any_token(
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(security_bearer)],
+) -> dict:
     if creds is None or creds.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Missing bearer token")
     try:
@@ -30,6 +35,7 @@ def verify_any_token(creds: Annotated[HTTPAuthorizationCredentials | None, Depen
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+
 class UploadUrlRequest(CamelModel):
     filename: str = Field(max_length=500)
     content_type: str = Field(default="application/octet-stream", max_length=128)
@@ -40,6 +46,7 @@ class UploadUrlRequest(CamelModel):
     payment_id: str | None = None
     layout_id: str | None = None
 
+
 class UploadUrlResponse(CamelModel):
     upload_url: str
     file_url: str
@@ -48,10 +55,10 @@ class UploadUrlResponse(CamelModel):
     storage_path: str
     expires_in: int
 
+
 @router.post("/upload-url", response_model=UploadUrlResponse)
 def get_upload_url(
-    body: UploadUrlRequest,
-    user_payload: dict = Depends(verify_any_token)
+    body: UploadUrlRequest, user_payload: dict = Depends(verify_any_token)
 ) -> UploadUrlResponse:
     """
     Get a signed URL to upload a file directly to GCS.
@@ -74,7 +81,7 @@ def get_upload_url(
         upload_url = generate_upload_url(
             bucket=object_ref.bucket,
             object_key=object_ref.object_key,
-            content_type=body.content_type
+            content_type=body.content_type,
         )
 
         # Legacy compatibility field for existing clients.

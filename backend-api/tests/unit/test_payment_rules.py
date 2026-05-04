@@ -1,19 +1,11 @@
 """Unit tests for payment business rules (state machine, stage limits, evidence)."""
 
-from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
-from uuid import uuid4
-
-import pytest
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
 
 from domain.error_codes import (
     MISSING_PAYMENT_EVIDENCE,
-    PARTICIPANTS_INCOMPLETE,
-    PAYMENT_ALREADY_REVIEWED,
-    PAYMENT_INVALID_STATE,
-    STAGE_LIMIT_EXCEEDED,
 )
-from domain.exceptions import ConflictError, ValidationError
 
 
 class TestPaymentStateMachine:
@@ -36,11 +28,47 @@ class TestPaymentStateMachine:
         assert "APPROVED" not in ("DRAFT", "REJECTED")
 
 
+class TestResolveCommercialBucket:
+    """Every timestamp maps to a capped bucket (no silent skip on approval)."""
+
+    def _cfg(self):
+        cfg = MagicMock()
+        cfg.presale_start_date = datetime(2026, 10, 1, tzinfo=UTC)
+        cfg.presale_end_date = datetime(2026, 10, 31, 23, 59, 59, tzinfo=UTC)
+        cfg.sale_start_date = datetime(2026, 11, 10, tzinfo=UTC)
+        cfg.sale_end_date = datetime(2026, 12, 14, tzinfo=UTC)
+        cfg.max_presale_tickets = 4
+        cfg.max_sale_tickets = 3
+        return cfg
+
+    def test_gap_between_presale_and_sale_is_between_bucket(self):
+        from modules.payments.application.stage_capacity import resolve_commercial_bucket
+
+        cfg = self._cfg()
+        gap = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+        assert resolve_commercial_bucket(cfg, gap) == "between"
+
+    def test_before_presale_maps_to_presale_cap(self):
+        from modules.payments.application.stage_capacity import resolve_commercial_bucket
+
+        cfg = self._cfg()
+        early = datetime(2026, 9, 1, tzinfo=UTC)
+        assert resolve_commercial_bucket(cfg, early) == "presale"
+
+    def test_after_sale_maps_to_sale_cap(self):
+        from modules.payments.application.stage_capacity import resolve_commercial_bucket
+
+        cfg = self._cfg()
+        late = datetime(2027, 1, 1, tzinfo=UTC)
+        assert resolve_commercial_bucket(cfg, late) == "sale"
+
+
 class TestStageTicketLimits:
     """Test RN-TIME-02/03: presale max 4, general max 3."""
 
-    def _make_cfg(self, presale_start, presale_end, sale_start, sale_end,
-                  max_presale=4, max_sale=3):
+    def _make_cfg(
+        self, presale_start, presale_end, sale_start, sale_end, max_presale=4, max_sale=3
+    ):
         cfg = MagicMock()
         cfg.presale_start_date = presale_start
         cfg.presale_end_date = presale_end
@@ -60,7 +88,7 @@ class TestStageTicketLimits:
             sale_end=datetime(2026, 12, 14, tzinfo=UTC),
         )
         assert cfg.presale_start_date <= now <= cfg.presale_end_date
-        assert 4 <= cfg.max_presale_tickets
+        assert cfg.max_presale_tickets >= 4
 
     def test_presale_exceeds_limit(self):
         """5 tickets during presale should fail."""
@@ -85,7 +113,7 @@ class TestStageTicketLimits:
             sale_end=datetime(2026, 12, 14, tzinfo=UTC),
         )
         assert cfg.sale_start_date <= now <= cfg.sale_end_date
-        assert 3 <= cfg.max_sale_tickets
+        assert cfg.max_sale_tickets >= 3
 
     def test_general_sale_exceeds_limit(self):
         """4 tickets during general sale should fail."""

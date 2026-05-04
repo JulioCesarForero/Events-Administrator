@@ -2,7 +2,6 @@ from uuid import UUID
 
 import jwt
 from fastapi import APIRouter, HTTPException, Request
-from shared.api.schemas import CamelModel
 from sqlalchemy import func, select
 
 from config.settings import settings
@@ -17,7 +16,8 @@ from infrastructure.persistence.models import (
 )
 from infrastructure.security.jwt_tokens import decode_token
 from infrastructure.storage.signed_urls import generate_download_url
-from shared.api.deps import DbSession, ensure_event_staff_access, StaffUserDep
+from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
+from shared.api.schemas import CamelModel
 
 router = APIRouter(tags=["map"])
 
@@ -189,7 +189,9 @@ def get_event_map(event_id: UUID, request: Request, db: DbSession) -> MapEnvelop
     return MapEnvelope(
         event_id=event_id,
         layout_id=layout_id,
-        background_image_url=_resolve_background_url(layout.background_image_url) if layout else None,
+        background_image_url=_resolve_background_url(layout.background_image_url)
+        if layout
+        else None,
         tables=_map_tables(db, layout_id),
     )
 
@@ -208,7 +210,7 @@ def update_layout_background(
     layout = db.get(Layout, layout_id)
     if not layout:
         raise HTTPException(status_code=404, detail="Layout not found")
-    
+
     # Simple check: if the user is staff, we assume they have access to the tenant's layout
     # In a more strict version, we'd check membership
     layout.background_image_url = body.background_image_url

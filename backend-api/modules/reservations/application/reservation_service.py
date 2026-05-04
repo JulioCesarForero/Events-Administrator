@@ -1,13 +1,9 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from modules.payments.application.stage_capacity import (
-    sum_approved_tickets_for_group,
-    sum_confirmed_reservation_spots,
-)
 from sqlalchemy import func, select, text
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from domain.error_codes import (
     EVENT_NO_LAYOUT_BINDING,
@@ -31,6 +27,10 @@ from infrastructure.persistence.models import (
     ReservationCodeAssignment,
     ReservationConsent,
     TableReservation,
+)
+from modules.payments.application.stage_capacity import (
+    sum_approved_tickets_for_group,
+    sum_confirmed_reservation_spots,
 )
 
 DATA_POLICY = "DATA_POLICY"
@@ -75,23 +75,19 @@ def _next_reservation_sequence_number(db: Session, event_id: UUID) -> int:
         # Serialize fallback allocators per event to avoid duplicate sequences.
         db.execute(
             text(
-                "SELECT pg_advisory_xact_lock(("
-                "'x' || substr(md5(:eid), 1, 16)"
-                ")::bit(64)::bigint)"
+                "SELECT pg_advisory_xact_lock(('x' || substr(md5(:eid), 1, 16))::bit(64)::bigint)"
             ),
             {"eid": str(event_id)},
         )
         seq = db.execute(
-            select(func.coalesce(func.max(ReservationCodeAssignment.code_sequence_number), 0) + 1).where(
-                ReservationCodeAssignment.event_id == event_id
-            )
+            select(
+                func.coalesce(func.max(ReservationCodeAssignment.code_sequence_number), 0) + 1
+            ).where(ReservationCodeAssignment.event_id == event_id)
         ).scalar_one()
         return int(seq)
 
 
-def reservation_code_block(
-    base_seq: int, count: int
-) -> tuple[list[tuple[int, str]], int, int]:
+def reservation_code_block(base_seq: int, count: int) -> tuple[list[tuple[int, str]], int, int]:
     """Build per-row (code_sequence_number, reservation_code) from one DB-allocated base.
 
     ``_next_reservation_sequence_number`` must be called **once** per reservation
@@ -122,7 +118,9 @@ def create_reservation(
     if pay.event_id != event_id or pay.attendee_group_id != group_id:
         raise ValidationError("Payment does not belong to this group/event")
     if pay.status != "APPROVED":
-        raise ValidationError("Payment must be approved before reserving", code=PAYMENT_NOT_APPROVED)
+        raise ValidationError(
+            "Payment must be approved before reserving", code=PAYMENT_NOT_APPROVED
+        )
 
     total_spots = sum(a.spots for a in allocations)
     sum_approved = sum_approved_tickets_for_group(db, group_id, event_id)
@@ -144,7 +142,9 @@ def create_reservation(
     if pol.document_type != DATA_POLICY or terms.document_type != EVENT_TERMS:
         raise ValidationError("Invalid document types for consent")
     if pol.status != "PUBLISHED" or terms.status != "PUBLISHED":
-        raise ValidationError("Policy and terms must be published", code=LEGAL_DOCUMENTS_NOT_PUBLISHED)
+        raise ValidationError(
+            "Policy and terms must be published", code=LEGAL_DOCUMENTS_NOT_PUBLISHED
+        )
 
     binding = db.execute(
         select(EventLayoutBinding)
@@ -168,13 +168,17 @@ def create_reservation(
     rows = {r.id: r for r in db.execute(stmt).scalars()}
 
     if len(rows) != len(table_ids):
-        raise ValidationError("One or more tables are not part of the event layout", code=INVALID_ALLOCATION)
+        raise ValidationError(
+            "One or more tables are not part of the event layout", code=INVALID_ALLOCATION
+        )
 
     for a in sorted(allocations, key=lambda x: str(x.layout_table_id)):
         t = rows[a.layout_table_id]
         free = t.table_capacity_limit - t.current_occupied_spots
         if a.spots > free:
-            raise ConflictError(f"Not enough capacity on table {t.code}", code=TABLE_CAPACITY_CONFLICT)
+            raise ConflictError(
+                f"Not enough capacity on table {t.code}", code=TABLE_CAPACITY_CONFLICT
+            )
 
     res = Reservation(
         event_id=event_id,
@@ -222,14 +226,18 @@ def create_reservation(
                 Reservation.event_id == event_id,
                 Reservation.status == "CONFIRMED",
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     participants_all = list(
         db.execute(
             select(Participant)
             .where(Participant.attendee_group_id == group_id)
             .order_by(Participant.id)
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     participants_for_codes = [p for p in participants_all if p.id not in assigned_participant_ids][
         :total_spots

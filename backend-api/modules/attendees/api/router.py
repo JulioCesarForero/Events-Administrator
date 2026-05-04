@@ -3,11 +3,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import Field
-
-from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from domain.error_codes import PARTICIPANT_LIMIT_EXCEEDED
+from domain.exceptions import ValidationError
 from infrastructure.persistence.models import (
     AttendeeGroup,
     Event,
@@ -19,8 +19,6 @@ from infrastructure.persistence.models import (
     TableReservation,
 )
 from modules.attendees.domain.rules import ensure_participant_editable_window
-from domain.error_codes import PARTICIPANT_LIMIT_EXCEEDED
-from domain.exceptions import ValidationError
 from modules.payments.application.stage_capacity import (
     current_max_participants_per_group,
     latest_approved_payment_id,
@@ -30,11 +28,11 @@ from modules.payments.application.stage_capacity import (
 from shared.api.deps import (
     BuyerClaimsDep,
     DbSession,
-    StaffUserDep,
     buyer_event_id,
     buyer_group_id,
     ensure_event_staff_access,
 )
+from shared.api.schemas import CamelModel, CamelOrmModel
 
 router = APIRouter(tags=["attendees"])
 
@@ -60,18 +58,16 @@ def _effective_group_payment(db: Session, group: AttendeeGroup) -> Payment | Non
     )
     if pay is not None and pay.status == "APPROVED":
         return pay
-    return (
-        db.execute(
-            select(Payment)
-            .where(
-                Payment.attendee_group_id == group.id,
-                Payment.event_id == group.event_id,
-                Payment.status == "APPROVED",
-            )
-            .order_by(Payment.approved_at.desc())
-            .limit(1)
-        ).scalar_one_or_none()
-    )
+    return db.execute(
+        select(Payment)
+        .where(
+            Payment.attendee_group_id == group.id,
+            Payment.event_id == group.event_id,
+            Payment.status == "APPROVED",
+        )
+        .order_by(Payment.approved_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
 
 
 class MyGroupPaymentOut(CamelOrmModel):
@@ -121,9 +117,7 @@ def get_my_group(
     cfg = db.execute(
         select(EventConfiguration).where(EventConfiguration.event_id == event_id)
     ).scalar_one_or_none()
-    wf: Payment | None = (
-        db.get(Payment, g.current_payment_id) if g.current_payment_id else None
-    )
+    wf: Payment | None = db.get(Payment, g.current_payment_id) if g.current_payment_id else None
     pay = wf if wf is not None else _effective_group_payment(db, g)
     payment_out = None
     if pay is not None:
@@ -192,7 +186,9 @@ def get_my_reservations(
                 Reservation.status == "CONFIRMED",
             )
             .order_by(Reservation.created_at.asc())
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     out: list[MyReservationOut] = []
     for res in reservations:
@@ -202,7 +198,9 @@ def get_my_reservations(
                     TableReservation.reservation_id == res.id,
                     TableReservation.status == "ACTIVE",
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         out.append(
             MyReservationOut(
@@ -300,9 +298,11 @@ def list_participants(
         auth = request.headers.get("authorization", "")
         if auth.lower().startswith("bearer "):
             token = auth.split(" ", 1)[1].strip()
+            import jwt as _jwt
+
             from config.settings import settings
             from infrastructure.security.jwt_tokens import decode_token
-            import jwt as _jwt
+
             try:
                 payload = decode_token(token, settings.jwt_staff_audience)
                 uid = payload.get("sub")
@@ -321,9 +321,7 @@ def list_participants(
         raise HTTPException(status_code=401, detail="Authentication required")
     _can_access_group(db, staff, claims, group_id)
     return list(
-        db.execute(
-            select(Participant).where(Participant.attendee_group_id == group_id)
-        ).scalars()
+        db.execute(select(Participant).where(Participant.attendee_group_id == group_id)).scalars()
     )
 
 

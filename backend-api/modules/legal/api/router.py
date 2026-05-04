@@ -3,11 +3,22 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import Field
-
-from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import select
-from infrastructure.persistence.models import AttendeeGroup, Event, EventPolicyDocument, ReservationConsent
-from shared.api.deps import BuyerClaimsDep, DbSession, StaffUserDep, buyer_group_id, ensure_event_staff_access
+
+from infrastructure.persistence.models import (
+    AttendeeGroup,
+    Event,
+    EventPolicyDocument,
+    ReservationConsent,
+)
+from shared.api.deps import (
+    BuyerClaimsDep,
+    DbSession,
+    StaffUserDep,
+    buyer_group_id,
+    ensure_event_staff_access,
+)
+from shared.api.schemas import CamelModel, CamelOrmModel
 
 router = APIRouter(tags=["legal"])
 

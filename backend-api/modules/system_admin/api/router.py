@@ -3,6 +3,7 @@
 Endpoints are gated by ``ensure_super_admin`` which requires the authenticated
 StaffUser to have a ``UserTenantMembership`` with role ``SUPER_ADMIN`` globally.
 """
+
 from __future__ import annotations
 
 import re
@@ -12,9 +13,9 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import AfterValidator, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from infrastructure.persistence.audit import append_audit_log
 from infrastructure.persistence.models import (
@@ -47,6 +48,7 @@ Email = Annotated[str, AfterValidator(_check_email)]
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
+
 
 class SystemUserMembershipInput(CamelModel):
     tenant_id: UUID
@@ -85,6 +87,7 @@ class PasswordResetOut(CamelModel):
 # Super Admin Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/tenants/{tenant_id}/users",
     response_model=list[SystemUserOut],
@@ -95,7 +98,7 @@ def list_system_users_by_tenant(
     staff: StaffUserDep,
 ) -> list[SystemUserOut]:
     ensure_super_admin(db, staff)
-    
+
     rows = db.execute(
         select(StaffUser, UserTenantMembership)
         .join(
@@ -136,9 +139,7 @@ def create_system_user(
     ).scalar_one_or_none()
 
     if existing is not None:
-        raise HTTPException(
-            status_code=409, detail="User with this email already exists"
-        )
+        raise HTTPException(status_code=409, detail="User with this email already exists")
 
     user = StaffUser(
         email=body.email,
@@ -169,7 +170,7 @@ def create_system_user(
         entity_id=user.id,
         action="CREATE_BY_SUPER_ADMIN",
     )
-    
+
     # Return with the first role if any, else None
     role = body.memberships[0].role if body.memberships else None
     return SystemUserOut(
@@ -201,7 +202,7 @@ def patch_system_user(
         if body.status not in ("ACTIVE", "INVITED", "DISABLED"):
             raise HTTPException(status_code=400, detail="Invalid status")
         user.status = body.status
-    
+
     role = None
     if body.tenant_id is not None and body.role is not None:
         membership = db.execute(
@@ -210,7 +211,7 @@ def patch_system_user(
                 UserTenantMembership.tenant_id == body.tenant_id,
             )
         ).scalar_one_or_none()
-        
+
         if membership:
             membership.role = body.role
         else:
@@ -224,9 +225,11 @@ def patch_system_user(
     else:
         # Try to get the first role if we didn't update it but need it for response
         membership = db.execute(
-            select(UserTenantMembership).where(
+            select(UserTenantMembership)
+            .where(
                 UserTenantMembership.user_id == user_id,
-            ).limit(1)
+            )
+            .limit(1)
         ).scalar_one_or_none()
         if membership:
             role = membership.role
@@ -243,7 +246,7 @@ def patch_system_user(
         entity_id=user.id,
         action="UPDATE_BY_SUPER_ADMIN",
     )
-    
+
     return SystemUserOut(
         id=user.id,
         email=user.email,
@@ -295,8 +298,8 @@ def reset_system_user_password(
         raise HTTPException(status_code=404, detail="User not found")
 
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-    new_password = ''.join(secrets.choice(alphabet) for _ in range(12))
-    
+    new_password = "".join(secrets.choice(alphabet) for _ in range(12))
+
     user.password_hash = hash_password(new_password)
     db.flush()
 

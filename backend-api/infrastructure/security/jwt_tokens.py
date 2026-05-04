@@ -31,7 +31,9 @@ def decode_token(token: str, audience: str) -> dict[str, Any]:
 
 
 def create_staff_token(*, user_id: UUID, email: str) -> str:
-    return _encode({"sub": str(user_id), "email": email, "typ": "staff"}, settings.jwt_staff_audience)
+    return _encode(
+        {"sub": str(user_id), "email": email, "typ": "staff"}, settings.jwt_staff_audience
+    )
 
 
 def create_buyer_token(*, group_id: UUID, event_id: UUID, student_code: str) -> str:

@@ -16,8 +16,8 @@ from modules.students.application.student_service import (
 from shared.api.deps import (
     DbSession,
     StaffUserDep,
-    ensure_event_viewer_access,
     ensure_event_student_manager_access,
+    ensure_event_viewer_access,
 )
 from shared.api.schemas import CamelModel, CamelOrmModel
 
@@ -27,6 +27,7 @@ router = APIRouter(tags=["students"])
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
+
 
 class StudentOut(CamelOrmModel):
     id: UUID
@@ -88,6 +89,7 @@ class StudentSummaryOut(CamelModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/events/{event_id}/students",

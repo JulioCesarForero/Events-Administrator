@@ -4,8 +4,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import AliasChoices, Field, computed_field
-
-from shared.api.schemas import CamelModel, CamelOrmModel
 from sqlalchemy import or_, select
 
 from domain.error_codes import (
@@ -14,8 +12,6 @@ from domain.error_codes import (
     PARTICIPANTS_INCOMPLETE,
     PAYMENT_ALREADY_REVIEWED,
     PAYMENT_INVALID_STATE,
-    PAYMENT_NOT_APPROVED,
-    STAGE_LIMIT_EXCEEDED,
 )
 from domain.exceptions import ConflictError, ValidationError
 from infrastructure.persistence.audit import append_audit_log
@@ -27,6 +23,12 @@ from infrastructure.persistence.models import (
     Payment,
     PaymentEvidence,
 )
+from modules.payments.application.stage_capacity import (
+    assert_approval_fits_bucket,
+    assert_stage_ticket_capacity,
+    lock_attendee_group_for_capacity,
+    refresh_group_approved_ticket_count,
+)
 from shared.api.deps import (
     BuyerClaimsDep,
     DbSession,
@@ -36,11 +38,7 @@ from shared.api.deps import (
     ensure_event_payment_access,
     ensure_event_viewer_access,
 )
-from modules.payments.application.stage_capacity import (
-    assert_approval_fits_bucket,
-    assert_stage_ticket_capacity,
-    refresh_group_approved_ticket_count,
-)
+from shared.api.schemas import CamelModel, CamelOrmModel
 
 router = APIRouter(tags=["payments"])
 
@@ -101,6 +99,7 @@ def create_payment(
     claims: BuyerClaimsDep,
 ) -> Payment:
     g = _buyer_group(db, claims, group_id)
+    lock_attendee_group_for_capacity(db, group_id)
     assert_stage_ticket_capacity(
         db,
         event_id=g.event_id,
@@ -140,13 +139,16 @@ def patch_payment(
         raise HTTPException(status_code=404, detail="Payment not found")
     _buyer_group(db, claims, p.attendee_group_id)
     if p.status not in ("DRAFT", "REJECTED"):
-        raise ConflictError("Payment cannot be edited in current status", code=PAYMENT_INVALID_STATE)
+        raise ConflictError(
+            "Payment cannot be edited in current status", code=PAYMENT_INVALID_STATE
+        )
 
     patch_data = body.model_dump(exclude_unset=True)
     # Re-apply stage limits when the ticket quantity changes, matching
     # RN-TIME-02/03 so the buyer cannot bypass presale/sale caps via PATCH.
     new_qty = patch_data.get("ticket_quantity")
     if new_qty is not None and new_qty != p.ticket_quantity:
+        lock_attendee_group_for_capacity(db, p.attendee_group_id)
         assert_stage_ticket_capacity(
             db,
             event_id=p.event_id,
@@ -236,15 +238,16 @@ def submit_payment(
     if p.status != "DRAFT":
         raise ConflictError("Invalid payment state", code=PAYMENT_INVALID_STATE)
 
-    participant_count = db.execute(
-        select(Participant).where(Participant.attendee_group_id == g.id)
-    ).scalars().all()
+    participant_count = (
+        db.execute(select(Participant).where(Participant.attendee_group_id == g.id)).scalars().all()
+    )
     if len(participant_count) < p.ticket_quantity:
         raise ValidationError(
             f"All {p.ticket_quantity} participants must be registered before submitting payment",
             code=PARTICIPANTS_INCOMPLETE,
         )
 
+    lock_attendee_group_for_capacity(db, g.id)
     assert_stage_ticket_capacity(
         db,
         event_id=g.event_id,
@@ -253,9 +256,11 @@ def submit_payment(
     )
 
     if p.payment_type in ("DIGITAL", "CASH"):
-        evidence = db.execute(
-            select(PaymentEvidence).where(PaymentEvidence.payment_id == payment_id)
-        ).scalars().first()
+        evidence = (
+            db.execute(select(PaymentEvidence).where(PaymentEvidence.payment_id == payment_id))
+            .scalars()
+            .first()
+        )
         if evidence is None:
             raise ValidationError(
                 "Payment requires evidence (comprobante o recibo) before submission",
@@ -334,8 +339,14 @@ def approve_payment(
     ensure_event_payment_access(db, staff, p.event_id)
     if p.status != "PENDING_APPROVAL":
         raise ConflictError("Payment is not pending approval", code=PAYMENT_ALREADY_REVIEWED)
+    lock_attendee_group_for_capacity(db, p.attendee_group_id)
+    db.refresh(p)
+    if p.status != "PENDING_APPROVAL":
+        raise ConflictError("Payment is not pending approval", code=PAYMENT_ALREADY_REVIEWED)
     original_qty = p.ticket_quantity
-    approved_count = (body.approved_ticket_count if body and body.approved_ticket_count else p.ticket_quantity)
+    approved_count = (
+        body.approved_ticket_count if body and body.approved_ticket_count else p.ticket_quantity
+    )
     if approved_count < 1 or approved_count > original_qty:
         raise ValidationError(
             "La cantidad aprobada debe ser entre 1 y la cantidad solicitada en el pago.",
@@ -421,6 +432,7 @@ def create_cash_payment(
     g = db.get(AttendeeGroup, body.attendee_group_id)
     if g is None or g.event_id != event_id:
         raise HTTPException(status_code=400, detail="Invalid group for event")
+    lock_attendee_group_for_capacity(db, body.attendee_group_id)
     assert_stage_ticket_capacity(
         db,
         event_id=event_id,
@@ -489,12 +501,12 @@ def evidence_upload_url(
     db: DbSession,
     claims: BuyerClaimsDep,
 ) -> EvidenceUrlResponse:
+    from config.settings import settings
     from infrastructure.storage.signed_urls import (
         build_object_ref,
         generate_upload_url,
         validate_upload_constraints,
     )
-    from config.settings import settings
 
     p = db.get(Payment, payment_id)
     if p is None:
@@ -505,7 +517,7 @@ def evidence_upload_url(
             "Evidence can only be uploaded while the payment is in draft",
             code=PAYMENT_INVALID_STATE,
         )
-    
+
     ev = db.get(Event, p.event_id)
     tenant_id = ev.tenant_id if ev else "default-tenant"
 
@@ -514,7 +526,7 @@ def evidence_upload_url(
         content_type=body.mime_type,
         size_bytes=body.size_bytes,
     )
-    
+
     object_ref = build_object_ref(
         purpose="evidence",
         filename=body.file_name or "evidence.bin",
@@ -562,7 +574,11 @@ def register_evidence(
             bucket, key = path_part.split("/", 1)
             return bucket, key, f"https://storage.googleapis.com/{bucket}/{key}"
         if body.bucket and body.object_key:
-            return body.bucket, body.object_key, f"https://storage.googleapis.com/{body.bucket}/{body.object_key}"
+            return (
+                body.bucket,
+                body.object_key,
+                f"https://storage.googleapis.com/{body.bucket}/{body.object_key}",
+            )
         if body.file_url:
             parsed = urlparse(body.file_url)
             if parsed.netloc.endswith("storage.googleapis.com"):
@@ -655,7 +671,7 @@ def list_payment_evidences(
         ).scalars()
     )
     for evidence in evidences:
-        setattr(evidence, "view_url", _signed_view_url(evidence) or evidence.file_url)
+        evidence.view_url = _signed_view_url(evidence) or evidence.file_url
     return evidences
 
 
@@ -691,7 +707,7 @@ def list_payment_evidences_buyer(
         ).scalars()
     )
     for evidence in evidences:
-        setattr(evidence, "view_url", _signed_view_url(evidence) or evidence.file_url)
+        evidence.view_url = _signed_view_url(evidence) or evidence.file_url
     return evidences
 
 

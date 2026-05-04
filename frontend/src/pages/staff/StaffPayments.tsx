@@ -527,6 +527,19 @@ export const StaffPayments = () => {
               Confirma la cantidad aprobada. Si es menor, el comprador sólo podrá reservar esa cantidad
               de cupos.
             </p>
+            <p
+              style={{
+                color: 'var(--text-muted)',
+                margin: 0,
+                fontSize: '0.85rem',
+                lineHeight: 1.45,
+              }}
+            >
+              El servidor valida el tope acumulado por estudiante según la etapa comercial (preventa /
+              venta general) e incluye otros pagos pendientes o ya aprobados del mismo grupo. Si dos
+              revisores intentan aprobar en paralelo, uno puede recibir error: es la protección contra
+              sobre-cupo.
+            </p>
             <Input
               label="Boletas aprobadas"
               type="number"
