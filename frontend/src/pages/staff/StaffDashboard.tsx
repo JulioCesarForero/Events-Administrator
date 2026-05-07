@@ -158,6 +158,15 @@ export const StaffDashboard = () => {
                {(isAdmin || isPaymentStaff || isViewer) && (
                  <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/students`)}>Estudiantes</Button>
                )}
+               {(isAdmin || isPaymentStaff || isViewer) && (
+                 <Button
+                   size="sm"
+                   variant="outline"
+                   onClick={() => navigate(`/staff/events/${ev.id}/student-reservations`)}
+                 >
+                   Reservas
+                 </Button>
+               )}
                
                {(isAdmin || isOrganizer) && (
                  <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/map`)}>Diseño de Plano</Button>

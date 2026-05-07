@@ -84,11 +84,29 @@ With `DEBUG=true`, interactive Swagger documentation is available at `/docs` (or
 | `/v1/reservations/{reservationId}/release` | POST | Buyer | Release a reservation (frees table spots). |
 | `/v1/reservations/{reservationId}/move` | POST | Buyer | Move reservation to different tables (same total spots). |
 
+## Staff: grupos, asistentes y reservas (panel operativo)
+
+Consolidated search and admin actions for buyer groups (`AttendeeGroup`), aligned with table-based reservations and audit.
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/v1/events/{eventId}/staff/groups/search` | GET | Staff (`VIEW_STUDENTS`) | Query params: `student_code`, `name`, `document_id`, `payment_status`, `reservation_status`, `layout_table_id`, `limit`. Returns lightweight group rows. |
+| `/v1/events/{eventId}/staff/groups/{groupId}` | GET | Staff (`VIEW_STUDENTS`) | Consolidated detail: portal-style summary, full participants, payments, reservations with table lines and codes. |
+| `/v1/events/{eventId}/staff/groups/{groupId}/audit-log` | GET | Staff (`VIEW_STUDENTS`) | Audit entries for the group (entity ids, payloads with `attendeeGroupId`, legacy `reservation_id` in manual adjustments). |
+| `/v1/events/{eventId}/staff/participants/{participantId}` | PATCH | Staff (`MANAGE_STUDENTS`) | Body: `{ "reason", "fields": { ... } }`. Admin edit without buyer edit window; writes `STAFF_UPDATE_PARTICIPANT` audit. |
+| `/v1/events/{eventId}/staff/groups/{groupId}/participants` | POST | **SUPER_ADMIN** + staff event access | Body: `{ "reason", "participant": { ... } }`. Insert after approved payment; enforces approved ticket count and stage participant cap. |
+| `/v1/events/{eventId}/staff/reservations/{reservationId}/release` | POST | **SUPER_ADMIN** + staff event access | Body: `{ "reason" }`. Frees table spots via reservation service; audit `STAFF_RELEASE_RESERVATION`. |
+| `/v1/events/{eventId}/staff/reservations/{reservationId}/move` | POST | **SUPER_ADMIN** + staff event access | Body: `{ "reason", "allocations": [{ "layoutTableId", "spots" }] }`. Same semantics as buyer move; preserves reservation codes. |
+| `/v1/events/{eventId}/staff/reports/venue-attendees` | GET | **SUPER_ADMIN** + staff event access | Report for venue/restaurant: participants grouped by student, reservation code, table code(s), full participant fields, totals. Query: `format=json` (default) or `format=csv`, `include_non_active` (default `false` excludes rows that only reflect released/non-active seating; keeps participants without a reservation code). |
+| `/v1/events/{eventId}/staff/reports/payment-approvals` | GET | **SUPER_ADMIN** + staff event access | Financial approval report: who approved each payment, which student/group it belongs to, approved amounts/tickets and event totals. Query: `format=json` (default) or `format=csv`. |
+
+`RELEASE_RESERVATION` via `/v1/events/{eventId}/manual-adjustments` also requires **SUPER_ADMIN** (legacy path; prefer staff reservation release above).
+
 ## Operations
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/v1/events/{eventId}/manual-adjustments` | POST | Staff | Manual operational adjustment (RELEASE_RESERVATION, UPDATE_TABLE_CAPACITY, etc.). |
+| `/v1/events/{eventId}/manual-adjustments` | POST | Staff | Manual operational adjustment (`RELEASE_RESERVATION` **SUPER_ADMIN only**, `UPDATE_TABLE_CAPACITY`, etc.). |
 | `/v1/events/{eventId}/audit-log` | GET | Staff | View audit log for an event. |
 
 ## Error Model

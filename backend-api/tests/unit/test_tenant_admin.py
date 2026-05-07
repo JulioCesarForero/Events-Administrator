@@ -18,7 +18,11 @@ def _fake_staff():
 
 def test_ensure_tenant_admin_rejects_user_without_membership():
     db = MagicMock()
-    db.execute.return_value.scalar_one_or_none.return_value = None
+    first = MagicMock()
+    first.scalar_one_or_none.return_value = None
+    second = MagicMock()
+    second.scalar_one_or_none.return_value = None
+    db.execute.side_effect = [first, second]
     with pytest.raises(HTTPException) as exc:
         ensure_tenant_admin(db, _fake_staff(), uuid4())
     assert exc.value.status_code == 403
@@ -26,7 +30,11 @@ def test_ensure_tenant_admin_rejects_user_without_membership():
 
 def test_ensure_tenant_admin_rejects_non_admin_role():
     db = MagicMock()
-    db.execute.return_value.scalar_one_or_none.return_value = SimpleNamespace(role="STAFF")
+    first = MagicMock()
+    first.scalar_one_or_none.return_value = None  # not SUPER_ADMIN globally
+    second = MagicMock()
+    second.scalar_one_or_none.return_value = SimpleNamespace(role="STAFF")
+    db.execute.side_effect = [first, second]
     with pytest.raises(HTTPException) as exc:
         ensure_tenant_admin(db, _fake_staff(), uuid4())
     assert exc.value.status_code == 403
@@ -35,7 +43,11 @@ def test_ensure_tenant_admin_rejects_non_admin_role():
 def test_ensure_tenant_admin_accepts_owner_role():
     db = MagicMock()
     membership = SimpleNamespace(role="OWNER")
-    db.execute.return_value.scalar_one_or_none.return_value = membership
+    first = MagicMock()
+    first.scalar_one_or_none.return_value = None
+    second = MagicMock()
+    second.scalar_one_or_none.return_value = membership
+    db.execute.side_effect = [first, second]
     result = ensure_tenant_admin(db, _fake_staff(), uuid4())
     assert result is membership
 
@@ -43,6 +55,10 @@ def test_ensure_tenant_admin_accepts_owner_role():
 def test_ensure_tenant_admin_accepts_admin_role():
     db = MagicMock()
     membership = SimpleNamespace(role="ADMIN")
-    db.execute.return_value.scalar_one_or_none.return_value = membership
+    first = MagicMock()
+    first.scalar_one_or_none.return_value = None
+    second = MagicMock()
+    second.scalar_one_or_none.return_value = membership
+    db.execute.side_effect = [first, second]
     result = ensure_tenant_admin(db, _fake_staff(), uuid4())
     assert result is membership

@@ -32,6 +32,7 @@ from modules.operations.api.router import router as operations_router
 from modules.payments.api.router import router as payments_router
 from modules.reservations.api.router import router as reservations_router
 from modules.staff_admin.api.router import router as staff_admin_router
+from modules.staff_event_groups.api import staff_event_groups_router
 from modules.students.api.router import router as students_router
 from modules.system_admin.api.router import router as system_admin_router
 from modules.venues.api.router import router as venues_router
@@ -198,6 +199,7 @@ def create_app() -> FastAPI:
     v1.include_router(reservations_router)
     v1.include_router(audit_router)
     v1.include_router(operations_router)
+    v1.include_router(staff_event_groups_router)
     v1.include_router(staff_admin_router)
     v1.include_router(system_admin_router)
     v1.include_router(storage_router)

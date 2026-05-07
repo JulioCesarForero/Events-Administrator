@@ -17,7 +17,8 @@ const ACTION_CATALOG: Array<{ key: ActionKey; label: string; description: string
   {
     key: 'RELEASE_RESERVATION',
     label: 'Liberar reserva',
-    description: 'Libera una reserva existente y sus cupos en mesa. Queda registrada en auditoría.',
+    description:
+      'Solo SUPER_ADMIN. Libera una reserva existente y sus cupos en mesa. Preferible usar la pantalla Reservas por estudiante (POST /events/.../staff/reservations/.../release).',
   },
   {
     key: 'UPDATE_TABLE_CAPACITY',

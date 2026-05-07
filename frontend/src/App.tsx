@@ -21,6 +21,7 @@ import { StaffPolicies } from './pages/staff/StaffPolicies';
 import { StaffMap } from './pages/staff/StaffMap';
 import { StaffEventWizard } from './pages/staff/StaffEventWizard';
 import { StaffManualAdjustments } from './pages/staff/StaffManualAdjustments';
+import { StaffStudentReservations } from './pages/staff/StaffStudentReservations';
 import { StaffAudit } from './pages/staff/StaffAudit';
 import { AdminStaffUsers } from './pages/staff/AdminStaffUsers';
 import { AdminEventStaff } from './pages/staff/AdminEventStaff';
@@ -241,6 +242,14 @@ export default function App() {
               <Route path="events/new" element={<RequireStaffAuth><StaffEventWizard /></RequireStaffAuth>} />
               <Route path="events/:eventId/payments" element={<RequireStaffAuth><StaffPayments /></RequireStaffAuth>} />
               <Route path="events/:eventId/students" element={<RequireStaffAuth><StaffStudents /></RequireStaffAuth>} />
+              <Route
+                path="events/:eventId/student-reservations"
+                element={
+                  <RequireStaffAuth>
+                    <StaffStudentReservations />
+                  </RequireStaffAuth>
+                }
+              />
               <Route path="events/:eventId/policies" element={<RequireStaffAuth><StaffPolicies /></RequireStaffAuth>} />
               <Route path="events/:eventId/map" element={<RequireStaffAuth><StaffMap /></RequireStaffAuth>} />
               <Route path="events/:eventId/manual-adjustments" element={<RequireStaffAuth><StaffManualAdjustments /></RequireStaffAuth>} />

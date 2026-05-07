@@ -399,4 +399,3 @@ Si deseas revisar la implementación y definición de las firmas directamente en
   
 Dentro de cada archivo `router.py`, las firmas de los métodos están definidas por las etiquetas como `@router.get(...)`, `@router.post(...)`, junto con sus modelos en Pydantic que determinan exactamente qué parámetros y qué payloads (contratos) espera recibir la API y cuáles va a devolver.
 
-

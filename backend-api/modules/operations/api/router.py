@@ -2,17 +2,12 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
 
-from domain.exceptions import ConflictError, ValidationError
+from domain.exceptions import ConflictError, NotFoundError, ValidationError
 from infrastructure.persistence.audit import append_audit_log
-from infrastructure.persistence.models import (
-    LayoutTable,
-    Reservation,
-    TableReservation,
-)
-from modules.reservations.application.reservation_service import recompute_group_reservation_status
-from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access
+from infrastructure.persistence.models import LayoutTable, Reservation
+from modules.reservations.application.reservation_service import release_reservation
+from shared.api.deps import DbSession, StaffUserDep, ensure_event_staff_access, ensure_super_admin
 from shared.api.schemas import CamelModel
 
 router = APIRouter(tags=["operations"])
@@ -44,29 +39,19 @@ def manual_adjustment(
     payload = body.payload or {}
 
     if body.action == "RELEASE_RESERVATION":
+        ensure_super_admin(db, staff)
         reservation_id = payload.get("reservation_id")
         if not reservation_id:
             raise ValidationError("reservation_id required in payload")
         res = db.get(Reservation, UUID(reservation_id))
         if res is None or res.event_id != event_id:
             raise HTTPException(status_code=404, detail="Reservation not found")
-        if res.status != "CONFIRMED":
-            raise ConflictError("Reservation is not active")
-        trs = list(
-            db.execute(
-                select(TableReservation).where(
-                    TableReservation.reservation_id == res.id,
-                    TableReservation.status == "ACTIVE",
-                )
-            ).scalars()
-        )
-        for tr in trs:
-            t = db.get(LayoutTable, tr.layout_table_id)
-            if t:
-                t.current_occupied_spots = max(0, t.current_occupied_spots - tr.spots_reserved)
-            tr.status = "RELEASED"
-        res.status = "RELEASED"
-        recompute_group_reservation_status(db, group_id=res.attendee_group_id, event_id=event_id)
+        try:
+            release_reservation(db, res.id, res.attendee_group_id)
+        except NotFoundError as e:
+            raise HTTPException(status_code=404, detail=e.message) from e
+        except ConflictError as e:
+            raise HTTPException(status_code=409, detail=e.message) from e
 
     elif body.action == "UPDATE_TABLE_CAPACITY":
         table_id = payload.get("layout_table_id")
