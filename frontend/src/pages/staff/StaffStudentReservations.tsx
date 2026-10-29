@@ -52,7 +52,8 @@ type GroupDetail = {
     }>;
   }>;
   reservationCodes: Array<{
-    participantId: string;
+    // null = vacant code (participant removed); goes to the next participant added.
+    participantId: string | null;
     reservationId: string;
     reservationCode: string;
     codeSequenceNumber: number;
@@ -93,6 +94,12 @@ export const StaffStudentReservations = () => {
   const [editReason, setEditReason] = useState('');
   const [editParticipant, setEditParticipant] = useState<ParticipantRow | null>(null);
   const [editForm, setEditForm] = useState<Partial<ParticipantRow>>({});
+  // 'replace' swaps the person: blank form, all fields required, keeps code and spot.
+  const [editMode, setEditMode] = useState<'edit' | 'replace'>('edit');
+
+  const [deleteParticipant, setDeleteParticipant] = useState<ParticipantRow | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const [addReason, setAddReason] = useState('');
   const [addForm, setAddForm] = useState({
@@ -187,13 +194,110 @@ export const StaffStudentReservations = () => {
   };
 
   const openEdit = (p: ParticipantRow) => {
+    setError('');
+    setEditMode('edit');
     setEditParticipant(p);
     setEditForm({ ...p });
     setEditReason('');
   };
 
+  const openReplace = (p: ParticipantRow) => {
+    setError('');
+    setEditMode('replace');
+    setEditParticipant(p);
+    setEditForm({
+      firstName: '',
+      lastName: '',
+      documentType: 'CC',
+      documentId: '',
+      mobilePhone: '',
+      emergencyContactName: '',
+      emergencyContactPhone: '',
+      isVegetarian: false,
+      allergies: '',
+      hasReducedMobility: false,
+    });
+    setEditReason('');
+  };
+
+  const codeByParticipant = new Map(
+    (detail?.reservationCodes ?? [])
+      .filter((c) => c.participantId)
+      .map((c) => [c.participantId as string, c.reservationCode]),
+  );
+  const participantNameById = new Map(
+    (detail?.participants ?? []).map((p) => [p.id, `${p.firstName} ${p.lastName}`]),
+  );
+
+  const submitReplace = async () => {
+    if (!session?.accessToken || !eventId || !editParticipant) return;
+    if (editReason.trim().length < 3) {
+      setError('Indica un motivo (mín. 3 caracteres).');
+      return;
+    }
+    const required: (keyof ParticipantRow)[] = [
+      'firstName',
+      'lastName',
+      'documentType',
+      'documentId',
+      'mobilePhone',
+      'emergencyContactName',
+      'emergencyContactPhone',
+    ];
+    if (required.some((k) => !String(editForm[k] ?? '').trim())) {
+      setError('Completa todos los datos de la nueva persona.');
+      return;
+    }
+    setError('');
+    try {
+      await apiClient.patch(
+        `/events/${eventId}/staff/participants/${editParticipant.id}`,
+        { reason: editReason, fields: editForm, replace: true },
+        { token: session.accessToken, isBearer: true },
+      );
+      setEditParticipant(null);
+      if (selectedGroupId) await loadDetail(selectedGroupId);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error reemplazando asistente');
+    }
+  };
+
+  const openDelete = (p: ParticipantRow) => {
+    setError('');
+    setDeleteParticipant(p);
+    setDeleteReason('');
+  };
+
+  const submitDelete = async () => {
+    if (!session?.accessToken || !eventId || !deleteParticipant) return;
+    if (deleteReason.trim().length < 3) {
+      setError('Indica un motivo (mín. 3 caracteres).');
+      return;
+    }
+    setError('');
+    setDeleting(true);
+    try {
+      await apiClient.delete(
+        `/events/${eventId}/staff/participants/${deleteParticipant.id}`,
+        { token: session.accessToken, isBearer: true },
+        { reason: deleteReason },
+      );
+      setDeleteParticipant(null);
+      if (selectedGroupId) await loadDetail(selectedGroupId);
+      void runSearch();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error eliminando asistente');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const submitEdit = async () => {
     if (!session?.accessToken || !eventId || !editParticipant) return;
+    if (editMode === 'replace') {
+      await submitReplace();
+      return;
+    }
     if (editReason.trim().length < 3) {
       setError('Indica un motivo (mín. 3 caracteres).');
       return;
@@ -549,6 +653,7 @@ export const StaffStudentReservations = () => {
                     <tr>
                       <th style={{ textAlign: 'left' }}>Nombre</th>
                       <th>Documento</th>
+                      <th>Código</th>
                       <th />
                     </tr>
                   </thead>
@@ -561,10 +666,23 @@ export const StaffStudentReservations = () => {
                         <td>
                           {p.documentType} {p.documentId}
                         </td>
+                        <td>{codeByParticipant.get(p.id) ?? '—'}</td>
                         <td>
-                          <Button size="sm" variant="outline" onClick={() => openEdit(p)}>
-                            Editar
-                          </Button>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <Button size="sm" variant="outline" onClick={() => openEdit(p)}>
+                              Editar
+                            </Button>
+                            {isSuperAdmin ? (
+                              <>
+                                <Button size="sm" variant="outline" onClick={() => openReplace(p)}>
+                                  Reemplazar
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => openDelete(p)}>
+                                  Eliminar
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -591,8 +709,13 @@ export const StaffStudentReservations = () => {
               <h4>Códigos</h4>
               <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.85rem' }}>
                 {detail.reservationCodes.map((c) => (
-                  <li key={`${c.reservationId}-${c.participantId}`}>
-                    Participante {c.participantId.slice(0, 8)}… → {c.reservationCode}
+                  <li key={`${c.reservationId}-${c.reservationCode}`}>
+                    {c.reservationCode} →{' '}
+                    {c.participantId ? (
+                      participantNameById.get(c.participantId) ?? `${c.participantId.slice(0, 8)}…`
+                    ) : (
+                      <strong>Vacante (se asigna al próximo asistente que agregues)</strong>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -706,7 +829,15 @@ export const StaffStudentReservations = () => {
           }}
         >
           <GlassCard style={{ maxWidth: '480px', width: '100%' }}>
-            <h3>Editar asistente</h3>
+            <h3>{editMode === 'replace' ? 'Reemplazar asistente' : 'Editar asistente'}</h3>
+            {editMode === 'replace' ? (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Reemplaza a {editParticipant.firstName} {editParticipant.lastName}.{' '}
+                {codeByParticipant.get(editParticipant.id)
+                  ? `La nueva persona conservará el código ${codeByParticipant.get(editParticipant.id)} y su puesto en la mesa.`
+                  : 'La nueva persona ocupará su lugar en el grupo.'}
+              </p>
+            ) : null}
             <Input label="Motivo" value={editReason} onChange={(e) => setEditReason(e.target.value)} />
             <Input
               label="Nombre"
@@ -718,14 +849,79 @@ export const StaffStudentReservations = () => {
               value={editForm.lastName ?? ''}
               onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
             />
+            {editMode === 'replace' ? (
+              <>
+                <Input
+                  label="Tipo doc"
+                  value={editForm.documentType ?? ''}
+                  onChange={(e) => setEditForm({ ...editForm, documentType: e.target.value })}
+                />
+                <Input
+                  label="Documento"
+                  value={editForm.documentId ?? ''}
+                  onChange={(e) => setEditForm({ ...editForm, documentId: e.target.value })}
+                />
+                <Input
+                  label="Celular"
+                  value={editForm.mobilePhone ?? ''}
+                  onChange={(e) => setEditForm({ ...editForm, mobilePhone: e.target.value })}
+                />
+                <Input
+                  label="Contacto emergencia"
+                  value={editForm.emergencyContactName ?? ''}
+                  onChange={(e) => setEditForm({ ...editForm, emergencyContactName: e.target.value })}
+                />
+              </>
+            ) : null}
             <Input
               label="Tel. emergencia"
               value={editForm.emergencyContactPhone ?? ''}
               onChange={(e) => setEditForm({ ...editForm, emergencyContactPhone: e.target.value })}
             />
+            {error ? <p style={{ color: 'salmon', margin: '8px 0 0' }}>{error}</p> : null}
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-              <Button onClick={() => void submitEdit()}>Guardar</Button>
+              <Button onClick={() => void submitEdit()}>
+                {editMode === 'replace' ? 'Reemplazar' : 'Guardar'}
+              </Button>
               <Button variant="outline" onClick={() => setEditParticipant(null)}>
+                Cancelar
+              </Button>
+            </div>
+          </GlassCard>
+        </div>
+      ) : null}
+
+      {deleteParticipant ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+            padding: '16px',
+          }}
+        >
+          <GlassCard style={{ maxWidth: '480px', width: '100%' }}>
+            <h3>Eliminar asistente</h3>
+            <p style={{ fontSize: '0.9rem' }}>
+              Se eliminará el registro de {deleteParticipant.firstName} {deleteParticipant.lastName}.
+            </p>
+            {codeByParticipant.get(deleteParticipant.id) ? (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                El código {codeByParticipant.get(deleteParticipant.id)} y su puesto en la mesa quedarán
+                vacantes y se asignarán al próximo asistente que agregues a este grupo.
+              </p>
+            ) : null}
+            <Input label="Motivo" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} />
+            {error ? <p style={{ color: 'salmon', margin: '8px 0 0' }}>{error}</p> : null}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+              <Button onClick={() => void submitDelete()} disabled={deleting}>
+                {deleting ? 'Eliminando…' : 'Eliminar'}
+              </Button>
+              <Button variant="outline" onClick={() => setDeleteParticipant(null)} disabled={deleting}>
                 Cancelar
               </Button>
             </div>

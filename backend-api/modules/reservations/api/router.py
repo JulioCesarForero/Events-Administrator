@@ -76,7 +76,8 @@ class ReservationCreateIn(CamelModel):
 
 
 class ReservationCodeOut(CamelModel):
-    participant_id: UUID
+    # None = vacant code (participant removed by staff).
+    participant_id: UUID | None
     code: str = Field(
         serialization_alias="code",
         validation_alias=AliasChoices("code", "reservationCode", "reservation_code"),

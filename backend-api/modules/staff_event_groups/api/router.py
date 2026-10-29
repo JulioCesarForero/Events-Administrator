@@ -32,7 +32,7 @@ from infrastructure.persistence.models import (
     StudentRecord,
     TableReservation,
 )
-from infrastructure.persistence.views import event_reservation_summary, participant_reservation_codes
+from infrastructure.persistence.views import event_reservation_summary
 from modules.attendees.api.router import MyGroupOut, MyGroupPaymentOut, _effective_group_payment
 from modules.payments.application.stage_capacity import (
     current_max_participants_per_group,
@@ -43,6 +43,7 @@ from modules.payments.application.stage_capacity import (
 from modules.reservations.api.router import AllocationIn, _build_reservation_out, _serialize_reservation
 from modules.reservations.application.reservation_service import (
     TableAllocation,
+    assign_vacant_code,
     move_reservation,
     release_reservation,
 )
@@ -119,7 +120,8 @@ class ReservationStaffDetailOut(CamelModel):
 
 
 class ReservationCodeStaffOut(CamelModel):
-    participant_id: UUID
+    # None = vacant code (participant removed by staff), assigned to the next participant added.
+    participant_id: UUID | None
     reservation_id: UUID
     reservation_code: str
     code_sequence_number: int
@@ -153,6 +155,8 @@ class StaffParticipantFieldsPatch(CamelModel):
 class StaffParticipantPatchBody(CamelModel):
     reason: str = Field(min_length=3, max_length=2000)
     fields: StaffParticipantFieldsPatch
+    # True when the person is swapped (keeps code and spot); audited as STAFF_REPLACE_PARTICIPANT.
+    replace: bool = False
 
 
 class StaffParticipantCreateIn(CamelModel):
@@ -1067,15 +1071,21 @@ def get_group_detail(
                 ],
             )
         )
-    raw_codes = participant_reservation_codes(db, group_id)
+    # Query assignments directly (not v_participant_reservation_codes) so vacant codes are listed.
+    rca_rows = db.execute(
+        select(ReservationCodeAssignment)
+        .join(Reservation, ReservationCodeAssignment.reservation_id == Reservation.id)
+        .where(Reservation.attendee_group_id == group_id, Reservation.event_id == event_id)
+        .order_by(ReservationCodeAssignment.code_sequence_number)
+    ).scalars()
     codes_out = [
         ReservationCodeStaffOut(
-            participant_id=UUID(str(r["participant_id"])),
-            reservation_id=UUID(str(r["reservation_id"])),
-            reservation_code=str(r["reservation_code"]),
-            code_sequence_number=int(r["code_sequence_number"]),
+            participant_id=r.participant_id,
+            reservation_id=r.reservation_id,
+            reservation_code=r.reservation_code,
+            code_sequence_number=r.code_sequence_number,
         )
-        for r in raw_codes
+        for r in rca_rows
     ]
     return StaffGroupDetailOut(
         summary=summary,
@@ -1166,7 +1176,7 @@ def staff_patch_participant(
         actor_type="STAFF",
         entity_type="participant",
         entity_id=p.id,
-        action="STAFF_UPDATE_PARTICIPANT",
+        action="STAFF_REPLACE_PARTICIPANT" if body.replace else "STAFF_UPDATE_PARTICIPANT",
         payload_json={
             "reason": body.reason,
             "attendeeGroupId": str(g.id),
@@ -1217,6 +1227,7 @@ def staff_create_participant(
     p = Participant(attendee_group_id=group_id, **pdata)
     db.add(p)
     db.flush()
+    rca = assign_vacant_code(db, group_id=group_id, event_id=event_id, participant_id=p.id)
     append_audit_log(
         db,
         tenant_id=ev.tenant_id,
@@ -1230,10 +1241,60 @@ def staff_create_participant(
             "reason": body.reason,
             "attendeeGroupId": str(group_id),
             "participant": pdata,
+            "assignedReservationCode": rca.reservation_code if rca else None,
         },
     )
     db.flush()
     return p
+
+
+@router.delete(
+    "/{event_id}/staff/participants/{participant_id}",
+    status_code=204,
+    response_class=Response,
+)
+def staff_delete_participant(
+    event_id: UUID,
+    participant_id: UUID,
+    body: StaffReasonBody,
+    db: DbSession,
+    staff: StaffUserDep,
+) -> Response:
+    """Remove a participant. A reservation code they held stays with the group as vacant."""
+    ensure_super_admin(db, staff)
+    ev = ensure_event_staff_access(db, staff, event_id)
+    p = db.get(Participant, participant_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    g = _load_group_in_event(db, event_id, p.attendee_group_id)
+    snapshot = ParticipantStaffOut.model_validate(p).model_dump(mode="json")
+    rca = db.execute(
+        select(ReservationCodeAssignment).where(
+            ReservationCodeAssignment.participant_id == participant_id
+        )
+    ).scalar_one_or_none()
+    if rca is not None:
+        rca.participant_id = None
+        db.flush()
+    db.delete(p)
+    append_audit_log(
+        db,
+        tenant_id=ev.tenant_id,
+        event_id=event_id,
+        actor_user_id=staff.id,
+        actor_type="STAFF",
+        entity_type="participant",
+        entity_id=participant_id,
+        action="STAFF_DELETE_PARTICIPANT",
+        payload_json={
+            "reason": body.reason,
+            "attendeeGroupId": str(g.id),
+            "participant": snapshot,
+            "vacatedReservationCode": rca.reservation_code if rca else None,
+        },
+    )
+    db.flush()
+    return Response(status_code=204)
 
 
 @router.post("/{event_id}/staff/reservations/{reservation_id}/release")
@@ -1313,7 +1374,7 @@ def staff_move_reservation(
         payload_json={
             "reason": body.reason,
             "attendeeGroupId": str(res.attendee_group_id),
-            "allocations": [a.model_dump(by_alias=True) for a in body.allocations],
+            "allocations": [a.model_dump(by_alias=True, mode="json") for a in body.allocations],
         },
     )
     db.flush()

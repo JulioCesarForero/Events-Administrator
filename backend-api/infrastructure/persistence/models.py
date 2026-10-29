@@ -572,8 +572,11 @@ class ReservationCodeAssignment(Base):
     reservation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("events.reservation.id", ondelete="CASCADE")
     )
-    participant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("events.participant.id", ondelete="RESTRICT")
+    # NULL = vacant code (participant removed by staff); see assign_vacant_code.
+    participant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("events.participant.id", ondelete="RESTRICT"),
+        nullable=True,
     )
     reservation_code: Mapped[str] = mapped_column(String(32))
     code_sequence_number: Mapped[int] = mapped_column(Integer)

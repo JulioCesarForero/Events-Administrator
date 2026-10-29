@@ -6,8 +6,8 @@ from pydantic import Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from domain.error_codes import PARTICIPANT_LIMIT_EXCEEDED
-from domain.exceptions import ValidationError
+from domain.error_codes import PARTICIPANT_HAS_RESERVATION_CODE, PARTICIPANT_LIMIT_EXCEEDED
+from domain.exceptions import ConflictError, ValidationError
 from infrastructure.persistence.models import (
     AttendeeGroup,
     Event,
@@ -15,6 +15,7 @@ from infrastructure.persistence.models import (
     Participant,
     Payment,
     Reservation,
+    ReservationCodeAssignment,
     StaffUser,
     TableReservation,
 )
@@ -25,6 +26,7 @@ from modules.payments.application.stage_capacity import (
     sum_approved_tickets_for_group,
     sum_confirmed_reservation_spots,
 )
+from modules.reservations.application.reservation_service import assign_vacant_code
 from shared.api.deps import (
     BuyerClaimsDep,
     DbSession,
@@ -355,6 +357,9 @@ def create_participant(
     p = Participant(attendee_group_id=group_id, **body.model_dump())
     db.add(p)
     db.flush()
+    # Fill a code left vacant by a staff removal, if any.
+    assign_vacant_code(db, group_id=group_id, event_id=g.event_id, participant_id=p.id)
+    db.flush()
     return p
 
 
@@ -396,6 +401,20 @@ def delete_participant(
     p = db.get(Participant, participant_id)
     if p is None or p.attendee_group_id != group_id:
         raise HTTPException(status_code=404, detail="Participant not found")
+
+    # reservation_code_assignment.participant_id is ON DELETE RESTRICT: a participant that
+    # already received a reservation code (QR) cannot be removed, only edited.
+    has_code = db.execute(
+        select(ReservationCodeAssignment.id)
+        .where(ReservationCodeAssignment.participant_id == participant_id)
+        .limit(1)
+    ).first()
+    if has_code is not None:
+        raise ConflictError(
+            "Este asistente ya tiene un código de reserva (QR) asignado y no puede eliminarse. "
+            "Si necesitas cambiar a la persona, edita sus datos.",
+            code=PARTICIPANT_HAS_RESERVATION_CODE,
+        )
 
     db.delete(p)
     db.flush()

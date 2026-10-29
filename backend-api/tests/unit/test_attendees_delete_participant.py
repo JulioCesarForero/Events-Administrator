@@ -4,12 +4,22 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
+from domain.exceptions import ConflictError
 from modules.attendees.api import router as attendees_router
 
 
+class _FakeResult:
+    def __init__(self, row):
+        self._row = row
+
+    def first(self):
+        return self._row
+
+
 class _FakeDb:
-    def __init__(self, participant):
+    def __init__(self, participant, code_row=None):
         self._participant = participant
+        self._code_row = code_row
         self.deleted = None
         self.flushed = False
 
@@ -17,6 +27,9 @@ class _FakeDb:
         if self._participant and self._participant.id == participant_id:
             return self._participant
         return None
+
+    def execute(self, _stmt):
+        return _FakeResult(self._code_row)
 
     def delete(self, participant):
         self.deleted = participant
@@ -79,3 +92,33 @@ def test_delete_participant_not_found_for_group(monkeypatch) -> None:
             db=fake_db,
             claims={"typ": "buyer"},
         )
+
+
+def test_delete_participant_with_reservation_code_is_blocked(monkeypatch) -> None:
+    group_id = uuid4()
+    participant = SimpleNamespace(id=uuid4(), attendee_group_id=group_id)
+    fake_db = _FakeDb(participant, code_row=(uuid4(),))
+    fake_group = SimpleNamespace(event_id=uuid4())
+    fake_event = SimpleNamespace(id=fake_group.event_id, event_date=None)
+
+    monkeypatch.setattr(attendees_router, "_can_access_group", lambda *_args, **_kwargs: fake_group)
+    monkeypatch.setattr(
+        attendees_router, "_load_event_for_group", lambda *_args, **_kwargs: fake_event
+    )
+    monkeypatch.setattr(attendees_router, "_event_timezone", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        attendees_router,
+        "ensure_participant_editable_window",
+        lambda *_args, **_kwargs: None,
+    )
+
+    with pytest.raises(ConflictError) as exc_info:
+        attendees_router.delete_participant(
+            group_id=group_id,
+            participant_id=participant.id,
+            db=fake_db,
+            claims={"typ": "buyer"},
+        )
+
+    assert exc_info.value.code == "PARTICIPANT_HAS_RESERVATION_CODE"
+    assert fake_db.deleted is None

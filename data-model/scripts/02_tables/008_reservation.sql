@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS events.reservation_code_assignment (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID NOT NULL,
     reservation_id UUID NOT NULL,
-    participant_id UUID NOT NULL,
+    participant_id UUID NULL,
     reservation_code VARCHAR(32) NOT NULL,
     code_sequence_number INTEGER NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()

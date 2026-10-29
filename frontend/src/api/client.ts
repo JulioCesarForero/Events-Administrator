@@ -188,8 +188,8 @@ export const apiClient = {
     fetchApi<T>(endpoint, 'PUT', body ?? {}, options),
   patch: <T>(endpoint: string, body?: unknown, options?: LegacyOptions) =>
     fetchApi<T>(endpoint, 'PATCH', body ?? {}, options),
-  delete: <T>(endpoint: string, options?: LegacyOptions) =>
-    fetchApi<T>(endpoint, 'DELETE', undefined, options),
+  delete: <T>(endpoint: string, options?: LegacyOptions, body?: unknown) =>
+    fetchApi<T>(endpoint, 'DELETE', body, options),
 };
 
 export { BASE_URL as API_BASE_URL };

@@ -53,6 +53,33 @@ def recompute_group_reservation_status(db: Session, *, group_id: UUID, event_id:
         grp.reservation_status = "CONFIRMED" if int(cnt) > 0 else "NONE"
 
 
+def assign_vacant_code(
+    db: Session, *, group_id: UUID, event_id: UUID, participant_id: UUID
+) -> ReservationCodeAssignment | None:
+    """Give the group's lowest vacant reservation code (left by a staff removal) to a participant.
+
+    The code keeps its table spot, so no occupancy or payment changes are needed.
+    Returns the assignment, or None when the group has no vacant code.
+    """
+    rca = db.execute(
+        select(ReservationCodeAssignment)
+        .join(Reservation, ReservationCodeAssignment.reservation_id == Reservation.id)
+        .where(
+            Reservation.attendee_group_id == group_id,
+            Reservation.event_id == event_id,
+            Reservation.status == "CONFIRMED",
+            ReservationCodeAssignment.participant_id.is_(None),
+        )
+        .order_by(ReservationCodeAssignment.code_sequence_number)
+        .limit(1)
+        .with_for_update(of=ReservationCodeAssignment)
+    ).scalar_one_or_none()
+    if rca is None:
+        return None
+    rca.participant_id = participant_id
+    return rca
+
+
 @dataclass
 class TableAllocation:
     layout_table_id: UUID

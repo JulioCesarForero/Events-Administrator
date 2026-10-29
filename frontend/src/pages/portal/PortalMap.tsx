@@ -34,7 +34,8 @@ interface MyGroup {
   latestApprovedPaymentId?: string | null;
 }
 
-type ReservedCode = { participantId: string; code: string };
+// participantId is null when staff removed the participant and the code is vacant.
+type ReservedCode = { participantId: string | null; code: string };
 type ReservedAlloc = { layoutTableId: string; spotsReserved: number; code?: string };
 
 interface ReservationConfirmation {
@@ -493,7 +494,7 @@ export const PortalMap = () => {
             <ul style={{ listStyle: 'none', padding: 0, marginTop: 0 }}>
               {confirmation.reservationCodes.map((c) => (
                 <li
-                  key={c.participantId}
+                  key={c.code}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -502,7 +503,7 @@ export const PortalMap = () => {
                   }}
                 >
                   <span style={{ color: 'var(--text-secondary)' }}>
-                    {c.participantId.slice(0, 8)}…
+                    {c.participantId ? `${c.participantId.slice(0, 8)}…` : 'Vacante'}
                   </span>
                   <strong>{c.code}</strong>
                 </li>
