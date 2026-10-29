@@ -5,7 +5,32 @@ import { useAuthStaff } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { StatusBadge, type BadgeTone } from '../../components/ui/StatusBadge';
 import { API_BASE_URL, apiClient } from '../../api/client';
+
+type DetailTab = 'asistentes' | 'reservas' | 'acciones' | 'auditoria';
+
+const statusTone = (status: string): BadgeTone => {
+  if (status === 'CONFIRMED' || status === 'ACTIVE' || status === 'APPROVED') return 'success';
+  if (status === 'RELEASED' || status === 'CANCELLED' || status === 'REJECTED') return 'error';
+  if (status === 'PENDING') return 'warn';
+  return 'neutral';
+};
+
+const cellStyle: React.CSSProperties = { padding: '8px 6px', verticalAlign: 'middle' };
+const sectionStyle: React.CSSProperties = {
+  border: '1px solid var(--border-light)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '10px 12px',
+};
+const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' };
+
+const SummaryStat = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', background: 'rgba(255,255,255,0.04)' }}>
+    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{label}</div>
+    <div style={{ fontSize: '1.1rem', fontWeight: 600, marginTop: '2px' }}>{children}</div>
+  </div>
+);
 
 type SearchRow = {
   groupId: string;
@@ -90,6 +115,7 @@ export const StaffStudentReservations = () => {
   const [detail, setDetail] = useState<GroupDetail | null>(null);
   const [audit, setAudit] = useState<AuditRow[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState<DetailTab>('asistentes');
 
   const [editReason, setEditReason] = useState('');
   const [editParticipant, setEditParticipant] = useState<ParticipantRow | null>(null);
@@ -228,6 +254,34 @@ export const StaffStudentReservations = () => {
   const participantNameById = new Map(
     (detail?.participants ?? []).map((p) => [p.id, `${p.firstName} ${p.lastName}`]),
   );
+  const vacantCodes = (detail?.reservationCodes ?? [])
+    .filter((c) => !c.participantId)
+    .sort((a, b) => a.codeSequenceNumber - b.codeSequenceNumber);
+  const detailTabs: Array<{ id: DetailTab; label: string }> = [
+    { id: 'asistentes', label: `Asistentes (${detail?.participants.length ?? 0})` },
+    { id: 'reservas', label: `Reservas (${detail?.reservations.length ?? 0})` },
+    ...(isSuperAdmin ? [{ id: 'acciones' as const, label: 'Acciones' }] : []),
+    { id: 'auditoria', label: `Auditoría (${audit.length})` },
+  ];
+
+  // Prefill the release / move forms from a reservation card and jump to the Acciones tab.
+  const prepareRelease = (reservationId: string) => {
+    setReleaseReservationId(reservationId);
+    setDetailTab('acciones');
+  };
+  const prepareMove = (rv: GroupDetail['reservations'][number]) => {
+    setMoveReservationId(rv.reservationId);
+    setMoveJson(
+      JSON.stringify(
+        rv.lines
+          .filter((ln) => ln.status === 'ACTIVE')
+          .map((ln) => ({ layoutTableId: ln.layoutTableId, spots: ln.spotsReserved })),
+        null,
+        2,
+      ),
+    );
+    setDetailTab('acciones');
+  };
 
   const submitReplace = async () => {
     if (!session?.accessToken || !eventId || !editParticipant) return;
@@ -584,43 +638,55 @@ export const StaffStudentReservations = () => {
         </Button>
       </GlassCard>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '16px', alignItems: 'start' }}>
-        <GlassCard>
-          <h3 style={{ marginTop: 0 }}>Resultados</h3>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }}>
+        <GlassCard style={{ flex: '1 1 260px', maxWidth: '340px', minWidth: 0, padding: '16px' }}>
+          <h3 style={{ marginTop: 0, fontSize: '1rem' }}>
+            Resultados {rows.length ? <span style={{ color: 'var(--text-muted)' }}>({rows.length})</span> : null}
+          </h3>
           {rows.length === 0 && !loading ? <p style={{ color: 'var(--text-secondary)' }}>Sin resultados.</p> : null}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto' }}>
-            {rows.map((r) => (
-              <button
-                key={r.groupId}
-                type="button"
-                onClick={() => void loadDetail(r.groupId)}
-                style={{
-                  textAlign: 'left',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border:
-                    selectedGroupId === r.groupId
-                      ? '1px solid var(--accent-primary)'
-                      : '1px solid var(--border-subtle)',
-                  background: selectedGroupId === r.groupId ? 'rgba(255,255,255,0.06)' : 'transparent',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                }}
-              >
-                <strong>{r.studentCodeSnapshot}</strong>
-                {r.displayName ? ` · ${r.displayName}` : ''}
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Reserva: {r.reservationStatus} · Boletas aprobadas: {r.approvedTicketCount} · Cupos activos:{' '}
-                  {r.activeSpotsReserved}
-                </div>
-              </button>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '70vh', overflowY: 'auto' }}>
+            {rows.map((r) => {
+              const selected = selectedGroupId === r.groupId;
+              return (
+                <button
+                  key={r.groupId}
+                  type="button"
+                  onClick={() => void loadDetail(r.groupId)}
+                  aria-pressed={selected}
+                  style={{
+                    textAlign: 'left',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)',
+                    background: selected ? 'rgba(255,255,255,0.06)' : 'transparent',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{r.studentCodeSnapshot}</div>
+                  {r.displayName ? (
+                    <div
+                      style={{ fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={r.displayName}
+                    >
+                      {r.displayName}
+                    </div>
+                  ) : null}
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
+                    <StatusBadge tone={statusTone(r.reservationStatus)}>{r.reservationStatus}</StatusBadge>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {r.activeSpotsReserved}/{r.approvedTicketCount} cupos
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </GlassCard>
 
-        <GlassCard>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ marginTop: 0 }}>Detalle del grupo</h3>
+        <GlassCard style={{ flex: '999 1 480px', minWidth: 0, padding: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem' }}>Detalle del grupo</h3>
             {selectedGroupId ? (
               <Button size="sm" variant="outline" onClick={() => void loadDetail(selectedGroupId)} icon={RefreshCw}>
                 Actualizar
@@ -629,187 +695,295 @@ export const StaffStudentReservations = () => {
           </div>
           {detailLoading ? <p>Cargando…</p> : null}
           {!detail && !detailLoading ? (
-            <p style={{ color: 'var(--text-secondary)' }}>Selecciona un grupo.</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Selecciona un grupo de la lista.</p>
           ) : null}
           {detail ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <pre
-                style={{
-                  fontSize: '0.8rem',
-                  overflow: 'auto',
-                  maxHeight: '160px',
-                  background: 'rgba(0,0,0,0.25)',
-                  padding: '8px',
-                  borderRadius: '6px',
-                }}
-              >
-                {JSON.stringify(detail.summary, null, 2)}
-              </pre>
-
-              <h4>Asistentes</h4>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left' }}>Nombre</th>
-                      <th>Documento</th>
-                      <th>Código</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.participants.map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          {p.firstName} {p.lastName}
-                        </td>
-                        <td>
-                          {p.documentType} {p.documentId}
-                        </td>
-                        <td>{codeByParticipant.get(p.id) ?? '—'}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            <Button size="sm" variant="outline" onClick={() => openEdit(p)}>
-                              Editar
-                            </Button>
-                            {isSuperAdmin ? (
-                              <>
-                                <Button size="sm" variant="outline" onClick={() => openReplace(p)}>
-                                  Reemplazar
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => openDelete(p)}>
-                                  Eliminar
-                                </Button>
-                              </>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+              <div>
+                <div style={{ fontWeight: 600 }}>
+                  {String(detail.summary.studentCodeSnapshot ?? '')}
+                  {detail.summary.displayName ? ` · ${String(detail.summary.displayName)}` : ''}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px', marginTop: '8px' }}>
+                  <SummaryStat label="Estado reserva">
+                    <StatusBadge tone={statusTone(String(detail.summary.reservationStatus ?? ''))}>
+                      {String(detail.summary.reservationStatus ?? '—')}
+                    </StatusBadge>
+                  </SummaryStat>
+                  <SummaryStat label="Boletas aprobadas">{String(detail.summary.approvedTicketCount ?? '—')}</SummaryStat>
+                  <SummaryStat label="Cupos activos">{String(detail.summary.activeSpotsReserved ?? '—')}</SummaryStat>
+                  <SummaryStat label="Saldo por reservar">
+                    {String(detail.summary.availableReservationBalance ?? '—')}
+                  </SummaryStat>
+                  <SummaryStat label="Asistentes">{detail.participants.length}</SummaryStat>
+                </div>
               </div>
 
-              <h4>Reservas</h4>
-              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.9rem' }}>
-                {detail.reservations.map((rv) => (
-                  <li key={rv.reservationId}>
-                    <code>{rv.reservationId}</code> · {rv.status} · {rv.totalSpotsReserved} cupos
-                    <ul>
-                      {rv.lines.map((ln) => (
-                        <li key={ln.id}>
-                          Mesa {ln.tableCode ?? ln.layoutTableId}: {ln.spotsReserved} ({ln.status})
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
-
-              <h4>Códigos</h4>
-              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.85rem' }}>
-                {detail.reservationCodes.map((c) => (
-                  <li key={`${c.reservationId}-${c.reservationCode}`}>
-                    {c.reservationCode} →{' '}
-                    {c.participantId ? (
-                      participantNameById.get(c.participantId) ?? `${c.participantId.slice(0, 8)}…`
-                    ) : (
-                      <strong>Vacante (se asigna al próximo asistente que agregues)</strong>
-                    )}
-                  </li>
-                ))}
-              </ul>
-
-              {isSuperAdmin ? (
-                <>
-                  <h4>Alta asistente (superadmin)</h4>
-                  <Input label="Motivo" value={addReason} onChange={(e) => setAddReason(e.target.value)} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <Input label="Nombre" value={addForm.firstName} onChange={(e) => setAddForm({ ...addForm, firstName: e.target.value })} />
-                    <Input label="Apellido" value={addForm.lastName} onChange={(e) => setAddForm({ ...addForm, lastName: e.target.value })} />
-                    <Input
-                      label="Tipo doc"
-                      value={addForm.documentType}
-                      onChange={(e) => setAddForm({ ...addForm, documentType: e.target.value })}
-                    />
-                    <Input
-                      label="Documento"
-                      value={addForm.documentId}
-                      onChange={(e) => setAddForm({ ...addForm, documentId: e.target.value })}
-                    />
-                    <Input
-                      label="Celular"
-                      value={addForm.mobilePhone}
-                      onChange={(e) => setAddForm({ ...addForm, mobilePhone: e.target.value })}
-                    />
-                    <Input
-                      label="Contacto emergencia"
-                      value={addForm.emergencyContactName}
-                      onChange={(e) => setAddForm({ ...addForm, emergencyContactName: e.target.value })}
-                    />
-                    <Input
-                      label="Tel. emergencia"
-                      value={addForm.emergencyContactPhone}
-                      onChange={(e) => setAddForm({ ...addForm, emergencyContactPhone: e.target.value })}
-                    />
-                  </div>
-                  <Button size="sm" onClick={() => void submitAddParticipant()}>
-                    Agregar asistente
-                  </Button>
-
-                  <h4>Liberar reserva (superadmin)</h4>
-                  <Input
-                    label="Reservation ID"
-                    value={releaseReservationId}
-                    onChange={(e) => setReleaseReservationId(e.target.value)}
-                  />
-                  <Input label="Motivo" value={releaseReason} onChange={(e) => setReleaseReason(e.target.value)} />
-                  <Button size="sm" variant="outline" onClick={() => void submitRelease()}>
-                    Liberar
-                  </Button>
-
-                  <h4>Mover reserva (superadmin)</h4>
-                  <Input
-                    label="Reservation ID"
-                    value={moveReservationId}
-                    onChange={(e) => setMoveReservationId(e.target.value)}
-                  />
-                  <Input label="Motivo" value={moveReason} onChange={(e) => setMoveReason(e.target.value)} />
-                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Allocations (JSON)</label>
-                  <textarea
-                    value={moveJson}
-                    onChange={(e) => setMoveJson(e.target.value)}
-                    rows={5}
-                    style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8rem' }}
-                  />
-                  <Button size="sm" variant="outline" onClick={() => void submitMove()}>
-                    Mover
-                  </Button>
-                </>
-              ) : null}
-
-              <h4>Auditoría del grupo</h4>
-              <div style={{ maxHeight: '220px', overflowY: 'auto', fontSize: '0.8rem' }}>
-                {audit.map((log) => (
-                  <div
-                    key={log.id}
+              <div role="tablist" aria-label="Secciones del grupo" style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border-light)', overflowX: 'auto' }}>
+                {detailTabs.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={detailTab === t.id}
+                    onClick={() => setDetailTab(t.id)}
                     style={{
-                      borderBottom: '1px solid var(--border-subtle)',
-                      padding: '6px 0',
+                      padding: '8px 12px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: detailTab === t.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                      color: detailTab === t.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      fontWeight: detailTab === t.id ? 600 : 400,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      fontSize: '0.85rem',
                     }}
                   >
-                    <div>
-                      <strong>{log.action}</strong> · {new Date(log.occurredAt).toLocaleString()}
-                    </div>
-                    <div style={{ color: 'var(--text-secondary)' }}>
-                      {log.entityType} {log.entityId ?? ''}
-                    </div>
-                    {log.payloadJson ? (
-                      <pre style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{JSON.stringify(log.payloadJson)}</pre>
-                    ) : null}
-                  </div>
+                    {t.label}
+                  </button>
                 ))}
               </div>
+
+              {detailTab === 'asistentes' ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ color: 'var(--text-secondary)', textAlign: 'left' }}>
+                        <th style={cellStyle}>Nombre</th>
+                        <th style={cellStyle}>Documento</th>
+                        <th style={cellStyle}>Código</th>
+                        <th style={{ ...cellStyle, textAlign: 'right' }}>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.participants.map((p) => (
+                        <tr key={p.id} style={{ borderTop: '1px solid var(--border-light)' }}>
+                          <td style={cellStyle}>
+                            {p.firstName} {p.lastName}
+                          </td>
+                          <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
+                            {p.documentType} {p.documentId}
+                          </td>
+                          <td style={cellStyle}>
+                            {codeByParticipant.get(p.id) ? (
+                              <code>{codeByParticipant.get(p.id)}</code>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)' }}>—</span>
+                            )}
+                          </td>
+                          <td style={cellStyle}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                              <Button size="sm" variant="outline" onClick={() => openEdit(p)}>
+                                Editar
+                              </Button>
+                              {isSuperAdmin ? (
+                                <>
+                                  <Button size="sm" variant="outline" onClick={() => openReplace(p)}>
+                                    Reemplazar
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => openDelete(p)}>
+                                    Eliminar
+                                  </Button>
+                                </>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {vacantCodes.map((c) => (
+                        <tr key={`vacant-${c.reservationCode}`} style={{ borderTop: '1px solid var(--border-light)' }}>
+                          <td style={{ ...cellStyle, color: 'var(--text-secondary)' }} colSpan={2}>
+                            Vacante: se asigna al próximo asistente que agregues
+                          </td>
+                          <td style={cellStyle}>
+                            <code>{c.reservationCode}</code>
+                          </td>
+                          <td style={{ ...cellStyle, textAlign: 'right' }}>
+                            <StatusBadge tone="warn">Vacante</StatusBadge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {detail.participants.length === 0 && vacantCodes.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)' }}>Este grupo no tiene asistentes.</p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {detailTab === 'reservas' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {detail.reservations.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)' }}>Sin reservas.</p>
+                  ) : null}
+                  {detail.reservations.map((rv) => (
+                    <div
+                      key={rv.reservationId}
+                      style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '10px' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: 0 }}>
+                          <StatusBadge tone={statusTone(rv.status)}>{rv.status}</StatusBadge>
+                          <span style={{ fontSize: '0.85rem' }}>{rv.totalSpotsReserved} cupos</span>
+                          <code
+                            title={rv.reservationId}
+                            style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}
+                          >
+                            {rv.reservationId.slice(0, 8)}…
+                          </code>
+                        </div>
+                        {isSuperAdmin && rv.status === 'CONFIRMED' ? (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <Button size="sm" variant="outline" onClick={() => prepareMove(rv)}>
+                              Mover
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => prepareRelease(rv.reservationId)}>
+                              Liberar
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px', fontSize: '0.8rem' }}>
+                        {rv.lines.map((ln) => (
+                          <span
+                            key={ln.id}
+                            style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: 'rgba(255,255,255,0.06)' }}
+                          >
+                            Mesa {ln.tableCode ?? ln.layoutTableId.slice(0, 8)} · {ln.spotsReserved} ({ln.status})
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px', fontSize: '0.8rem' }}>
+                        {detail.reservationCodes
+                          .filter((c) => c.reservationId === rv.reservationId)
+                          .map((c) => (
+                            <span key={c.reservationCode} style={{ color: 'var(--text-secondary)' }}>
+                              <code>{c.reservationCode}</code>{' '}
+                              {c.participantId ? (
+                                participantNameById.get(c.participantId) ?? `${c.participantId.slice(0, 8)}…`
+                              ) : (
+                                <strong style={{ color: 'var(--warning)' }}>Vacante</strong>
+                              )}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {detailTab === 'acciones' && isSuperAdmin ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <details open style={sectionStyle}>
+                    <summary style={summaryStyle}>Agregar asistente</summary>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginTop: '8px' }}>
+                      <Input label="Nombre" value={addForm.firstName} onChange={(e) => setAddForm({ ...addForm, firstName: e.target.value })} />
+                      <Input label="Apellido" value={addForm.lastName} onChange={(e) => setAddForm({ ...addForm, lastName: e.target.value })} />
+                      <Input
+                        label="Tipo doc"
+                        value={addForm.documentType}
+                        onChange={(e) => setAddForm({ ...addForm, documentType: e.target.value })}
+                      />
+                      <Input
+                        label="Documento"
+                        value={addForm.documentId}
+                        onChange={(e) => setAddForm({ ...addForm, documentId: e.target.value })}
+                      />
+                      <Input
+                        label="Celular"
+                        value={addForm.mobilePhone}
+                        onChange={(e) => setAddForm({ ...addForm, mobilePhone: e.target.value })}
+                      />
+                      <Input
+                        label="Contacto emergencia"
+                        value={addForm.emergencyContactName}
+                        onChange={(e) => setAddForm({ ...addForm, emergencyContactName: e.target.value })}
+                      />
+                      <Input
+                        label="Tel. emergencia"
+                        value={addForm.emergencyContactPhone}
+                        onChange={(e) => setAddForm({ ...addForm, emergencyContactPhone: e.target.value })}
+                      />
+                    </div>
+                    <Input label="Motivo" value={addReason} onChange={(e) => setAddReason(e.target.value)} />
+                    {vacantCodes.length ? (
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+                        Recibirá el código vacante {vacantCodes[0].reservationCode}.
+                      </p>
+                    ) : null}
+                    <Button size="sm" onClick={() => void submitAddParticipant()}>
+                      Agregar asistente
+                    </Button>
+                  </details>
+
+                  <details open={Boolean(releaseReservationId)} style={sectionStyle}>
+                    <summary style={summaryStyle}>Liberar reserva</summary>
+                    <div style={{ marginTop: '8px' }}>
+                      <Input
+                        label="Reservation ID"
+                        value={releaseReservationId}
+                        onChange={(e) => setReleaseReservationId(e.target.value)}
+                      />
+                      <Input label="Motivo" value={releaseReason} onChange={(e) => setReleaseReason(e.target.value)} />
+                      <Button size="sm" variant="outline" onClick={() => void submitRelease()}>
+                        Liberar
+                      </Button>
+                    </div>
+                  </details>
+
+                  <details open={Boolean(moveReservationId)} style={sectionStyle}>
+                    <summary style={summaryStyle}>Mover reserva</summary>
+                    <div style={{ marginTop: '8px' }}>
+                      <Input
+                        label="Reservation ID"
+                        value={moveReservationId}
+                        onChange={(e) => setMoveReservationId(e.target.value)}
+                      />
+                      <Input label="Motivo" value={moveReason} onChange={(e) => setMoveReason(e.target.value)} />
+                      <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Allocations (JSON)</label>
+                      <textarea
+                        value={moveJson}
+                        onChange={(e) => setMoveJson(e.target.value)}
+                        rows={5}
+                        style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8rem', marginBottom: '8px' }}
+                      />
+                      <Button size="sm" variant="outline" onClick={() => void submitMove()}>
+                        Mover
+                      </Button>
+                    </div>
+                  </details>
+                </div>
+              ) : null}
+
+              {detailTab === 'auditoria' ? (
+                <div style={{ maxHeight: '50vh', overflowY: 'auto', fontSize: '0.8rem' }}>
+                  {audit.length === 0 ? <p style={{ color: 'var(--text-secondary)' }}>Sin eventos.</p> : null}
+                  {audit.map((log) => (
+                    <details key={log.id} style={{ borderBottom: '1px solid var(--border-light)', padding: '6px 0' }}>
+                      <summary style={{ cursor: 'pointer' }}>
+                        <strong>{log.action}</strong>{' '}
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          · {new Date(log.occurredAt).toLocaleString()}
+                          {typeof log.payloadJson?.reason === 'string' ? ` · ${log.payloadJson.reason}` : ''}
+                        </span>
+                      </summary>
+                      <pre
+                        style={{
+                          margin: '6px 0 0',
+                          padding: '8px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(0,0,0,0.25)',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                        }}
+                      >
+                        {log.entityType} {log.entityId ?? ''}
+                        {log.payloadJson ? `\n${JSON.stringify(log.payloadJson, null, 2)}` : ''}
+                      </pre>
+                    </details>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </GlassCard>
