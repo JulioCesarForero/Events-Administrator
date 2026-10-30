@@ -73,11 +73,11 @@ function statusTone(
 ): { bg: string; fg: string; border?: string } {
   switch (status) {
     case 'APPROVED':
-      return { bg: 'rgba(57,255,20,0.15)', fg: 'var(--accent-primary)' };
+      return { bg: 'var(--success-dim)', fg: 'var(--success)' };
     case 'REJECTED':
-      return { bg: 'rgba(255,0,0,0.12)', fg: 'var(--error)' };
+      return { bg: 'var(--error-dim)', fg: 'var(--error)' };
     case 'PENDING_APPROVAL':
-      return { bg: 'rgba(255,193,7,0.15)', fg: '#FFC107' };
+      return { bg: 'var(--warning-dim)', fg: 'var(--warning)' };
     default:
       return { bg: 'rgba(255,255,255,0.06)', fg: 'var(--text-secondary)' };
   }
@@ -260,7 +260,7 @@ export const PortalPaymentStatus = () => {
         </button>
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0 }}>Mis pagos</h2>
-          <p style={{ margin: '6px 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+          <p style={{ margin: '6px 0 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
             Solicitudes enviadas, en revisión, rechazadas o aprobadas. Puedes corregir comprobantes solo
             mientras la solicitud está en borrador.
           </p>
@@ -277,7 +277,7 @@ export const PortalPaymentStatus = () => {
         <GlassCard style={{ marginBottom: '16px', borderLeft: '3px solid var(--error)' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <AlertTriangle size={20} color="var(--error)" />
-            <span style={{ color: 'var(--error)', fontSize: '0.9rem' }}>{actionError}</span>
+            <span style={{ color: 'var(--error)', fontSize: 'var(--text-sm)' }}>{actionError}</span>
           </div>
         </GlassCard>
       )}
@@ -331,7 +331,7 @@ export const PortalPaymentStatus = () => {
                         display: 'inline-block',
                         padding: '4px 12px',
                         borderRadius: '999px',
-                        fontSize: '0.8rem',
+                        fontSize: 'var(--text-sm)',
                         fontWeight: 600,
                         background: tone.bg,
                         color: tone.fg,
@@ -340,15 +340,15 @@ export const PortalPaymentStatus = () => {
                       {statusLabel(p.status)}
                     </span>
                     {isCurrent && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                         Solicitud actual
                       </span>
                     )}
                   </div>
-                  <p style={{ margin: '10px 0 4px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  <p style={{ margin: '10px 0 4px', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
                     {p.paymentType === 'CASH' ? 'Efectivo' : 'Transferencia'} · {p.ticketQuantity} boleta(s)
                   </p>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                     ID {p.id.slice(0, 8)}…
                     {p.createdAt && ` · Creada: ${new Date(p.createdAt).toLocaleString()}`}
                     {p.submittedAt && ` · Enviada: ${new Date(p.submittedAt).toLocaleString()}`}
@@ -414,18 +414,18 @@ export const PortalPaymentStatus = () => {
                     {isRejected ? (
                       <XCircle size={18} color="var(--error)" style={{ flexShrink: 0, marginTop: '2px' }} />
                     ) : (
-                      <AlertTriangle size={18} color="#FFC107" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <AlertTriangle size={18} color="var(--warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
                     )}
                     <div>
                       <strong
                         style={{
-                          color: isRejected ? 'var(--error)' : '#FFC107',
-                          fontSize: '0.85rem',
+                          color: isRejected ? 'var(--error)' : 'var(--warning)',
+                          fontSize: 'var(--text-sm)',
                         }}
                       >
                         {isRejected ? 'Nota del comité' : 'Nota del comité (último rechazo)'}
                       </strong>
-                      <p style={{ margin: '6px 0 0', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                      <p style={{ margin: '6px 0 0', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>
                         {staffNote}
                       </p>
                     </div>
@@ -434,16 +434,16 @@ export const PortalPaymentStatus = () => {
               )}
 
               {isPending && (
-                <p style={{ marginTop: '12px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                <p style={{ marginTop: '12px', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
                   El comité está revisando tu comprobante. Si subiste el archivo equivocado, usa «Retirar envío
                   para corregir», elimina la evidencia y vuelve a enviar.
                 </p>
               )}
 
               <div style={{ marginTop: '16px' }}>
-                <strong style={{ fontSize: '0.9rem' }}>Comprobantes ({evs.length})</strong>
+                <strong style={{ fontSize: 'var(--text-sm)' }}>Comprobantes ({evs.length})</strong>
                 {evs.length === 0 ? (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '8px 0 0' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', margin: '8px 0 0' }}>
                     Sin archivos adjuntos.
                   </p>
                 ) : (
@@ -474,7 +474,7 @@ export const PortalPaymentStatus = () => {
                               rel="noopener noreferrer"
                               style={{
                                 fontWeight: 600,
-                                color: 'var(--accent-primary)',
+                                color: 'var(--accent-text)',
                                 textDecoration: 'none',
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -484,7 +484,7 @@ export const PortalPaymentStatus = () => {
                               {ev.fileName || 'Archivo'}
                               <ExternalLink size={14} />
                             </a>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: '4px' }}>
                               {ev.mimeType || 'archivo'}
                               {ev.sizeBytes != null ? ` · ${formatSize(ev.sizeBytes)}` : ''}
                               {ev.createdAt ? ` · ${new Date(ev.createdAt).toLocaleString()}` : ''}
@@ -506,7 +506,7 @@ export const PortalPaymentStatus = () => {
                   </ul>
                 )}
                 {isDraft && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '10px' }}>
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: '10px' }}>
                     Solo puedes eliminar comprobantes que tú subiste, mientras la solicitud está en borrador.
                   </p>
                 )}

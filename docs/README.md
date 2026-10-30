@@ -7,6 +7,7 @@ Technical and operational documentation for Events Administrator.
 - [API Contract Summary](api-contract.md) — Complete endpoint reference with auth requirements, error codes, and serialization format.
 - [Authentication Flow](auth-flow.md) — Staff and buyer JWT authentication, token claims, and security notes.
 - [Environment Setup](environment-setup.md) — Prerequisites, Docker quick start, environment variables, and database management.
+- [Pendientes de UX/UI](ux-pendientes.md) — Mejoras de diseño por definir en versiones futuras (tema por tenant, navegación de staff, etc.).
 
 ## Additional References
 

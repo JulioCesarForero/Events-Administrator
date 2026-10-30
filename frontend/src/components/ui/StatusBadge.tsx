@@ -9,10 +9,10 @@ interface StatusBadgeProps {
 }
 
 const TONE_MAP: Record<BadgeTone, { bg: string; fg: string }> = {
-  success: { bg: 'rgba(57,255,20,0.18)', fg: 'var(--accent-primary)' },
-  warn: { bg: 'rgba(255,193,7,0.18)', fg: '#FFC107' },
-  error: { bg: 'rgba(255,0,0,0.18)', fg: 'var(--error)' },
-  info: { bg: 'rgba(0,212,255,0.18)', fg: '#00D4FF' },
+  success: { bg: 'var(--success-dim)', fg: 'var(--success)' },
+  warn: { bg: 'var(--warning-dim)', fg: 'var(--warning)' },
+  error: { bg: 'var(--error-dim)', fg: 'var(--error)' },
+  info: { bg: 'var(--info-dim)', fg: 'var(--info)' },
   neutral: { bg: 'rgba(255,255,255,0.08)', fg: 'var(--text-secondary)' },
 };
 
@@ -24,7 +24,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ tone = 'neutral', chil
         display: 'inline-block',
         padding: '3px 10px',
         borderRadius: '999px',
-        fontSize: '0.75rem',
+        fontSize: 'var(--text-xs)',
         fontWeight: 600,
         background: colors.bg,
         color: colors.fg,

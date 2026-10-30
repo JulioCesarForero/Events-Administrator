@@ -87,7 +87,7 @@ export const PortalMyReservations = () => {
         </button>
         <div>
           <h2 style={{ margin: 0 }}>Mis mesas</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
             Vista de solo lectura. Las mesas con número en círculo azul son tus cupos reservados.
           </p>
         </div>
@@ -112,25 +112,25 @@ export const PortalMyReservations = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <small style={{ color: 'var(--text-secondary)' }}>Reservas confirmadas</small>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{reservations.length}</div>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>{reservations.length}</div>
               </div>
               <div>
                 <small style={{ color: 'var(--text-secondary)' }}>Cupos en mesa</small>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{totalReserved}</div>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>{totalReserved}</div>
               </div>
             </div>
           </GlassCard>
 
           <GlassCard style={{ marginBottom: '20px' }}>
             <h3 style={{ marginTop: 0, marginBottom: '12px' }}>Por operación</h3>
-            <ol style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            <ol style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
               {reservations.map((r, idx) => (
                 <li key={r.reservationId} style={{ marginBottom: '14px' }}>
                   <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                     Reserva {idx + 1} · {r.totalSpotsReserved} cupo{r.totalSpotsReserved !== 1 ? 's' : ''}
                   </div>
                   {r.createdAt ? (
-                    <div style={{ fontSize: '0.8rem', marginTop: '2px' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', marginTop: '2px' }}>
                       {new Date(r.createdAt).toLocaleString()}
                     </div>
                   ) : null}
@@ -178,7 +178,7 @@ export const PortalMyReservations = () => {
                       justifyContent: 'space-between',
                       padding: '14px 0',
                       borderBottom: '1px solid var(--border-light)',
-                      fontSize: '0.95rem',
+                      fontSize: 'var(--text-base)',
                     }}
                   >
                     <span>

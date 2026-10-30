@@ -37,17 +37,17 @@ export const PortalLanding = () => {
               width: '48px',
               height: '48px',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(57,255,20,0.14)',
+              background: 'rgba(var(--accent-primary-rgb), 0.14)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Ticket color="var(--accent-primary)" />
+            <Ticket color="var(--accent-text)" />
           </div>
           <div>
             <h2 style={{ margin: 0 }}>Bienvenido al Portal</h2>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
               Aquí gestionas tu reserva del evento.
             </p>
           </div>
@@ -62,8 +62,8 @@ export const PortalLanding = () => {
             alignItems: 'flex-start',
           }}
         >
-          <Link color="var(--accent-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
+          <Link color="var(--accent-text)" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ fontSize: 'var(--text-sm)', lineHeight: 1.5 }}>
             El comité organizador te enviará un <strong>enlace directo</strong> o un{' '}
             <strong>código QR</strong> al evento. Ábrelo desde tu correo o WhatsApp para entrar
             sin escribir nada.

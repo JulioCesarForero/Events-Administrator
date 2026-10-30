@@ -222,7 +222,7 @@ export const PortalMap = () => {
               border: '1px solid var(--border-focus)',
               color: 'var(--text-primary)',
               cursor: 'pointer',
-              fontSize: '0.85rem',
+              fontSize: 'var(--text-sm)',
               padding: '8px 14px',
               borderRadius: 'var(--radius-md)',
             }}
@@ -238,7 +238,7 @@ export const PortalMap = () => {
             <AlertTriangle color="var(--error)" />
             <div>
               <strong>No se pudo cargar el mapa</strong>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{loadError}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{loadError}</div>
             </div>
           </div>
         </GlassCard>
@@ -255,7 +255,7 @@ export const PortalMap = () => {
       >
         <GlassCard style={{ minHeight: '500px', position: 'relative', overflow: 'hidden' }}>
           <h3 style={{ marginBottom: '12px' }}>Layout del Salón</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 0 16px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', margin: '0 0 16px' }}>
             Toca una mesa para asignarle cupos. Puedes reservar hasta {availableBalance} cupo(s) en esta operación
             {activeReserved > 0
               ? ` (${activeReserved} ya reservado(s) de ${approved} boletas aprobadas).`
@@ -303,10 +303,10 @@ export const PortalMap = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <GlassCard>
             <h3 style={{ marginBottom: '8px' }}>Tu Selección</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', margin: 0 }}>
               Total esta reserva: <strong>{totalAssigned}</strong> / {availableBalance}
               {approved > 0 ? (
-                <span style={{ display: 'block', marginTop: '4px', fontSize: '0.8rem' }}>
+                <span style={{ display: 'block', marginTop: '4px', fontSize: 'var(--text-sm)' }}>
                   Aprobadas: {approved} · Ya en mesa: {activeReserved}
                 </span>
               ) : null}
@@ -340,7 +340,7 @@ export const PortalMap = () => {
                               border: '1px solid var(--border-focus)',
                               background: 'transparent',
                               color: 'var(--text-primary)',
-                              width: 26, height: 26, borderRadius: '50%',
+                              width: 36, height: 36, borderRadius: '50%',
                               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
                             }}
                           ><Minus size={14}/></button>
@@ -351,8 +351,8 @@ export const PortalMap = () => {
                             style={{
                               border: 'none',
                               background: avail > 0 && totalAssigned < availableBalance ? 'var(--accent-primary)' : 'var(--border-light)',
-                              color: '#000',
-                              width: 26, height: 26, borderRadius: '50%',
+                              color: 'var(--on-accent)',
+                              width: 36, height: 36, borderRadius: '50%',
                               cursor: avail > 0 && totalAssigned < availableBalance ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center'
                             }}
                           ><Plus size={14}/></button>
@@ -364,18 +364,18 @@ export const PortalMap = () => {
             )}
 
             {!reservationPaymentId && (
-              <p style={{ color: 'var(--error)', fontSize: '0.85rem', marginTop: '12px' }}>
+              <p style={{ color: 'var(--error)', fontSize: 'var(--text-sm)', marginTop: '12px' }}>
                 Necesitas al menos una boleta aprobada antes de reservar.
               </p>
             )}
             {reservationPaymentId && approved > 0 && availableBalance === 0 && (
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '12px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginTop: '12px' }}>
                 Ya reservaste todos los cupos permitidos por tus boletas aprobadas. Si necesitas cambiar mesa, libera una
                 reserva previa o contacta al comité.
               </p>
             )}
             {(!policyDoc || !termsDoc) && (
-              <p style={{ color: 'var(--error)', fontSize: '0.85rem', marginTop: '8px' }}>
+              <p style={{ color: 'var(--error)', fontSize: 'var(--text-sm)', marginTop: '8px' }}>
                 El evento aún no tiene política y términos publicados.
               </p>
             )}
@@ -396,16 +396,16 @@ export const PortalMap = () => {
           <GlassCard>
             <h4 style={{ margin: 0 }}>Estado del inventario</h4>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-              <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(57,255,20,0.35)', border: '2px solid var(--accent-primary)' }} />
-              <span style={{ fontSize: '0.85rem' }}>Disponible</span>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(var(--accent-primary-rgb), 0.35)', border: '2px solid var(--accent-primary)' }} />
+              <span style={{ fontSize: 'var(--text-sm)' }}>Disponible</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-              <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,193,7,0.35)', border: '2px solid #FFC107' }} />
-              <span style={{ fontSize: '0.85rem' }}>Cupos limitados</span>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,193,7,0.35)', border: '2px solid var(--warning)' }} />
+              <span style={{ fontSize: 'var(--text-sm)' }}>Cupos limitados</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
               <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,0,0,0.35)', border: '2px solid var(--error)' }} />
-              <span style={{ fontSize: '0.85rem' }}>Sin cupos</span>
+              <span style={{ fontSize: 'var(--text-sm)' }}>Sin cupos</span>
             </div>
           </GlassCard>
         </div>
@@ -442,7 +442,7 @@ export const PortalMap = () => {
         </label>
 
         {submitError && (
-          <p style={{ color: 'var(--error)', fontSize: '0.85rem', marginBottom: '12px' }}>
+          <p style={{ color: 'var(--error)', fontSize: 'var(--text-sm)', marginBottom: '12px' }}>
             {submitError}
           </p>
         )}

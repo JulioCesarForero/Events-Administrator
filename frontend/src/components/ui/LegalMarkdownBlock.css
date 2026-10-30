@@ -60,7 +60,7 @@
 }
 
 .legal-md-block a {
-  color: var(--accent-primary);
+  color: var(--accent-text);
   word-break: break-word;
 }
 

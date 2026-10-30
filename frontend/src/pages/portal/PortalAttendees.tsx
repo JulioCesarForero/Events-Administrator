@@ -184,12 +184,12 @@ export const PortalAttendees = () => {
       </div>
 
       <GlassCard style={{ marginBottom: '16px', padding: '14px 18px' }}>
-        <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+        <p style={{ margin: 0, fontSize: 'var(--text-base)', color: 'var(--text-secondary)' }}>
           Asistentes registrados: <strong>{attendees.length}</strong> / {attendeeLimit} (máximo permitido
           en la etapa actual del evento).
         </p>
         {atAttendeeLimit && (
-          <p style={{ margin: '10px 0 0', fontSize: '0.85rem', color: 'var(--error)' }}>
+          <p style={{ margin: '10px 0 0', fontSize: 'var(--text-sm)', color: 'var(--error)' }}>
             {limitReachedMessage}
           </p>
         )}
@@ -199,17 +199,17 @@ export const PortalAttendees = () => {
         <GlassCard
           style={{
             marginBottom: '16px',
-            borderLeft: '3px solid #FFC107',
+            borderLeft: '3px solid var(--warning)',
             padding: '16px',
             display: 'flex',
             gap: '12px',
             alignItems: 'flex-start',
           }}
         >
-          <CalendarClock color="#FFC107" />
+          <CalendarClock color="var(--warning)" />
           <div>
             <strong>Edición de asistentes bloqueada</strong>
-            <p style={{ margin: '6px 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            <p style={{ margin: '6px 0 0', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
               Faltan {Math.max(0, Math.floor(days as number))} día(s) para el evento. Las
               modificaciones a los asistentes se cierran {EDIT_WINDOW_DAYS} días antes. Si necesitas
               un cambio, contacta al comité.
@@ -220,7 +220,7 @@ export const PortalAttendees = () => {
 
       {deleteSuccess && (
         <GlassCard style={{ marginBottom: '16px', padding: '12px 16px' }}>
-          <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--success)' }}>{deleteSuccess}</p>
+          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--success)' }}>{deleteSuccess}</p>
         </GlassCard>
       )}
 
@@ -235,7 +235,7 @@ export const PortalAttendees = () => {
                 <h4 style={{ margin: 0 }}>
                   {att.firstName} {att.lastName}
                 </h4>
-                <p style={{ margin: '4px 0 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                   {att.documentType} {att.documentId}
                 </p>
               </div>
@@ -286,7 +286,7 @@ export const PortalAttendees = () => {
             </div>
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
                   Tipo Doc.
                 </label>
                 <select
@@ -377,7 +377,7 @@ export const PortalAttendees = () => {
             )}
 
             {formError && (
-              <p style={{ color: 'var(--error)', fontSize: '0.85rem' }}>{formError}</p>
+              <p style={{ color: 'var(--error)', fontSize: 'var(--text-sm)' }}>{formError}</p>
             )}
 
             <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
@@ -406,7 +406,7 @@ export const PortalAttendees = () => {
         </p>
 
         {deleteError && (
-          <p style={{ marginTop: 0, marginBottom: '12px', color: 'var(--error)', fontSize: '0.9rem' }}>
+          <p style={{ marginTop: 0, marginBottom: '12px', color: 'var(--error)', fontSize: 'var(--text-sm)' }}>
             {deleteError}
           </p>
         )}

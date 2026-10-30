@@ -122,7 +122,7 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
          Establece las fechas de las etapas de venta. Has escogido el salón <strong>{wizardData.venueName}</strong> y Layout <strong>{wizardData.layoutName}</strong>.
       </p>
       {formError && (
-        <div className="glass-panel" style={{ marginBottom: '16px', border: '1px solid var(--error)', color: 'var(--error)', padding: '12px 16px' }}>
+        <div role="alert" className="glass-panel" style={{ marginBottom: '16px', border: '1px solid var(--error)', color: 'var(--error)', padding: '12px 16px' }}>
           {formError}
         </div>
       )}
@@ -130,7 +130,7 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
       <form onSubmit={handleFinish}>
         <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar color="var(--accent-primary)"/> <h4>Datos del Evento</h4>
+                <Calendar color="var(--accent-text)"/> <h4>Datos del Evento</h4>
             </div>
 
             <Input required label="Nombre del Evento a Publicar" placeholder="Ej. Grado Promoción 11° - 2026" value={formData.eventName} onChange={e=>setFormData({...formData, eventName: e.target.value})} />
@@ -154,7 +154,7 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
                     <Input required type="number" min="1" max="10" label="Boletas permitidas por estudiante en Venta Normal" value={formData.maxSale} onChange={e=>setFormData({...formData, maxSale: parseInt(e.target.value)||3})} />
                     
                     <div className="glass-panel" style={{ padding: '16px', marginTop: 'auto', background: 'rgba(var(--accent-primary-rgb), 0.1)' }}>
-                        <p style={{ margin: 0, fontSize: '0.85rem' }}>Al dar click en crear, la aplicación emitirá las instrucciones necesarias al Backend. El evento aparecerá inmediatamente en tu panel de Staff.</p>
+                        <p style={{ margin: 0, fontSize: 'var(--text-sm)' }}>Al dar click en crear, la aplicación emitirá las instrucciones necesarias al Backend. El evento aparecerá inmediatamente en tu panel de Staff.</p>
                     </div>
                 </div>
 

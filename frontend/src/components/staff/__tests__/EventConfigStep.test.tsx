@@ -56,9 +56,7 @@ describe('EventConfigStep', () => {
     expect(mockOnPrev).toHaveBeenCalled();
   });
 
-  it('submits 2 POST calls + 1 PUT call and redirects on successful creation', async () => {
-    const spyAlert = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
+  it('submits 2 POST calls + 1 PUT call and shows the success screen', async () => {
     // POST /events and POST /layout-binding
     (apiClient.post as any)
       .mockResolvedValueOnce({ id: 'new_evt_1', name: 'Graduation 2026' })
@@ -84,13 +82,18 @@ describe('EventConfigStep', () => {
       expect(apiClient.put).toHaveBeenCalledTimes(1);
     });
 
-    expect(spyAlert).toHaveBeenCalledWith('¡Evento creado, publicado y configurado exitosamente!');
+    // El paso ya no redirige solo: muestra la confirmación con los siguientes pasos.
+    expect(await screen.findByText('¡Evento Creado y Publicado!')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Distribuir Mesas Ahora/ }));
+    expect(mockNavigate).toHaveBeenCalledWith('/staff/events/new_evt_1/map');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ir al Dashboard' }));
     expect(mockNavigate).toHaveBeenCalledWith('/staff/dashboard');
   });
 
-  it('stops flow and warns user if any creation API fails', async () => {
-    const spyAlert = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    
+  it('stops flow and shows an inline error if any creation API fails', async () => {
     (apiClient.post as any).mockRejectedValueOnce(new Error('DB Constraint Violation'));
 
     renderWithRouter(<EventConfigStep wizardData={baseWizardData} onPrev={mockOnPrev} sessionToken={sessionToken} />);
@@ -105,11 +108,12 @@ describe('EventConfigStep', () => {
     
     fireEvent.click(screen.getByRole('button', { name: "Crear Evento Oficial" }));
 
-    await waitFor(() => {
-      expect(spyAlert).toHaveBeenCalledWith(expect.stringContaining('Error creando el Evento: DB Constraint Violation'));
-      // No debió invocar navigate de ok
-      expect(mockNavigate).not.toHaveBeenCalled();
-    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('DB Constraint Violation');
+    // No avanza: sigue en el formulario, sin más llamadas ni navegación
+    expect(apiClient.post).toHaveBeenCalledTimes(1);
+    expect(apiClient.put).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Crear Evento Oficial' })).toBeInTheDocument();
   });
 
   it('handles input fallbacks on tickets and empty dates in form change', () => {

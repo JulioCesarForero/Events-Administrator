@@ -73,7 +73,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           <>
             <Upload
               size={40}
-              style={{ color: file ? 'var(--accent-primary)' : 'var(--text-muted)', marginBottom: '8px' }}
+              style={{ color: file ? 'var(--accent-text)' : 'var(--text-muted)', marginBottom: '8px' }}
             />
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
               {file ? file.name : label}

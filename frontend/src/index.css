@@ -16,17 +16,41 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: var(--leading-normal);
 }
 
 a {
-  color: var(--accent-primary);
+  color: var(--accent-text);
   text-decoration: none;
   transition: color 0.3s ease;
 }
 
 a:hover {
   text-decoration: underline;
-  color: var(--accent-primary-hover);
+  color: var(--accent-text);
+}
+
+/* Anillo de foco global para navegación con teclado (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Utilidad para texto solo visible a lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 #root {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useAuthStaff } from '../../contexts/AuthContext';
@@ -28,6 +29,7 @@ const EVENT_ROLES = ['ORGANIZER', 'CASHIER', 'REVIEWER', 'COORDINATOR'];
 
 export const AdminEventStaff = () => {
   const { session } = useAuthStaff();
+  const confirm = useConfirm();
   const { eventId } = useParams();
   const navigate = useNavigate();
 
@@ -112,7 +114,13 @@ export const AdminEventStaff = () => {
 
   const removeAssignment = async (userId: string) => {
     if (!session || !eventId) return;
-    if (!window.confirm('¿Quitar este usuario del staff del evento?')) return;
+    const ok = await confirm({
+      title: 'Quitar del staff',
+      message: 'El usuario perderá el acceso a este evento.',
+      confirmLabel: 'Quitar',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setActionUserId(userId);
     try {
       await apiClient.delete(`/events/${eventId}/staff-assignments/${userId}`, {
@@ -257,7 +265,7 @@ export const AdminEventStaff = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px',
-                  fontSize: '0.9rem',
+                  fontSize: 'var(--text-sm)',
                 }}
               >
                 Usuario
@@ -278,7 +286,7 @@ export const AdminEventStaff = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px',
-                  fontSize: '0.9rem',
+                  fontSize: 'var(--text-sm)',
                 }}
               >
                 Rol en el evento
@@ -297,7 +305,7 @@ export const AdminEventStaff = () => {
             </>
           )}
           {assignError && (
-            <p style={{ color: 'var(--error)', margin: 0, fontSize: '0.9rem' }}>
+            <p style={{ color: 'var(--error)', margin: 0, fontSize: 'var(--text-sm)' }}>
               {assignError}
             </p>
           )}

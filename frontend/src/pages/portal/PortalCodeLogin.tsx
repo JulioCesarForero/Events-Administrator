@@ -93,7 +93,7 @@ export const PortalCodeLogin = () => {
           flexDirection: 'column',
           gap: '6px',
           alignItems: 'center',
-          fontSize: '0.85rem',
+          fontSize: 'var(--text-sm)',
         }}
       >
         <span style={{ color: 'var(--text-muted)' }}>
@@ -106,7 +106,7 @@ export const PortalCodeLogin = () => {
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--accent-primary)',
+              color: 'var(--accent-text)',
               cursor: 'pointer',
               textDecoration: 'underline',
               padding: 0,
@@ -121,7 +121,7 @@ export const PortalCodeLogin = () => {
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--accent-primary)',
+              color: 'var(--accent-text)',
               cursor: 'pointer',
               textDecoration: 'underline',
               padding: 0,

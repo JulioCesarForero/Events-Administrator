@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, UserPlus, Power, RefreshCw } from 'lucide-react';
 import { useAuthStaff } from '../../contexts/AuthContext';
@@ -36,6 +37,7 @@ const TENANT_ROLES = ['TENANT_ADMIN', 'STAFF'];
 
 export const AdminStaffUsers = () => {
   const { session } = useAuthStaff();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const [users, setUsers] = useState<StaffUserRow[]>([]);
@@ -138,7 +140,7 @@ export const AdminStaffUsers = () => {
         { password: newPassword },
         { token: session.accessToken, isBearer: true },
       );
-      alert('Contraseña actualizada. Compártela por un canal seguro.');
+      toast.success('Compártela por un canal seguro.', 'Contraseña actualizada');
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'No se pudo cambiar la contraseña';
@@ -315,7 +317,7 @@ export const AdminStaffUsers = () => {
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
-              fontSize: '0.9rem',
+              fontSize: 'var(--text-sm)',
             }}
           >
             Rol en el tenant
@@ -332,7 +334,7 @@ export const AdminStaffUsers = () => {
             </select>
           </label>
           {createError && (
-            <p style={{ color: 'var(--error)', margin: 0, fontSize: '0.9rem' }}>
+            <p style={{ color: 'var(--error)', margin: 0, fontSize: 'var(--text-sm)' }}>
               {createError}
             </p>
           )}

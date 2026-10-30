@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { AuthPortalProvider, AuthStaffProvider } from './contexts/AuthContext'
 import { ToastProvider } from './components/ui/Toast'
+import { ConfirmProvider } from './components/ui/ConfirmDialog'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,11 +21,13 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <AuthStaffProvider>
-          <AuthPortalProvider>
-            <App />
-          </AuthPortalProvider>
-        </AuthStaffProvider>
+        <ConfirmProvider>
+          <AuthStaffProvider>
+            <AuthPortalProvider>
+              <App />
+            </AuthPortalProvider>
+          </AuthStaffProvider>
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

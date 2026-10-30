@@ -24,7 +24,7 @@ export const Input: React.FC<InputProps> = ({
       {label && (
         <label
           htmlFor={inputId}
-          style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}
+          style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}
         >
           {label}
         </label>
@@ -56,7 +56,7 @@ export const Input: React.FC<InputProps> = ({
         />
       </div>
       {error && (
-        <span id={`${inputId}-error`} style={{ fontSize: '0.75rem', color: 'var(--error)' }}>
+        <span id={`${inputId}-error`} style={{ fontSize: 'var(--text-xs)', color: 'var(--error)' }}>
           {error}
         </span>
       )}

@@ -1,36 +1,85 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
+/*
+ * Tokens del sistema de diseño.
+ * Contraste verificado contra --bg-dark (#0a0a0c) con WCAG 2.2 AA:
+ * texto normal >= 4.5:1, texto grande / componentes UI >= 3:1.
+ */
 :root {
   /* Fondo Oscuro / Premium Dark Mode */
   --bg-dark: #0a0a0c;
   --bg-card: rgba(25, 25, 30, 0.6);
   --bg-card-hover: rgba(35, 35, 42, 0.7);
-  
+
   /* Textos */
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0ab;
-  --text-muted: #5f5f68;
+  --text-primary: #ffffff;   /* 19.8:1 */
+  --text-secondary: #a0a0ab; /* 7.7:1 */
+  --text-muted: #8b8b96;     /* 5.9:1 (antes #5f5f68, 3.1:1) */
 
   /* Bordes */
   --border-light: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.24);
   --border-focus: rgba(255, 255, 255, 0.2);
 
-  /* Tema por Defecto: Verde Neón */
+  /*
+   * Acento (lo redefine cada tema).
+   *  --accent-primary: fondo de botones primarios, bordes, brillos.
+   *  --accent-text:    acento usado como texto o icono sobre el fondo oscuro (>= 4.5:1).
+   *  --on-accent:      texto sobre un fondo --accent-primary (>= 4.5:1).
+   */
   --accent-primary: #39ff14;
+  --accent-primary-rgb: 57, 255, 20;
   --accent-primary-dim: rgba(57, 255, 20, 0.15);
   --accent-primary-hover: #32e011;
-  
-  /* Sistema */
-  --error: #ff3366;
+  --accent-text: #39ff14;
+  --on-accent: #000000;
+
+  /* Estados semánticos: independientes del tema para que su significado no cambie */
+  --success: #00e676;          /* 11.9:1 */
+  --success-dim: rgba(0, 230, 118, 0.15);
+  --warning: #ffc107;          /* 12.1:1 */
+  --warning-dim: rgba(255, 193, 7, 0.15);
+  --error: #ff3366;            /* 5.6:1 */
   --error-dim: rgba(255, 51, 102, 0.15);
-  --success: #00e676;
-  --warning: #ffea00;
-  
+  --error-strong: #e11d48;     /* fondo de botón peligro, blanco encima 4.7:1 */
+  --error-strong-hover: #be123c;
+  --info: #60a5fa;             /* 7.8:1 */
+  --info-dim: rgba(96, 165, 250, 0.15);
+  --on-status: #000000;        /* texto sobre fondos success/warning/info sólidos */
+
+  /* Foco visible (WCAG 2.4.7 / 2.4.11) */
+  --focus-ring: #ffffff;
+  --focus-ring-offset: 2px;
+
+  /* Escala tipográfica (1.125 / minor second-third) */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+
+  /* Espaciado (base 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
   /* Radios */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
   --radius-full: 9999px;
+
+  /* Tamaño mínimo de objetivo táctil (WCAG 2.5.8 / guías iOS-Material) */
+  --target-min: 44px;
 
   /* Sombras */
   --shadow-neon: 0 0 15px var(--accent-primary-dim);
@@ -39,27 +88,39 @@
   --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
 }
 
-/* Selector dinámico de temas */
+/* Selector dinámico de temas: cada uno define acento, texto de acento y texto sobre acento */
 body.theme-neon-green {
   --accent-primary: #39ff14;
+  --accent-primary-rgb: 57, 255, 20;
   --accent-primary-dim: rgba(57, 255, 20, 0.15);
   --accent-primary-hover: #32e011;
+  --accent-text: #39ff14;    /* 14.6:1 */
+  --on-accent: #000000;      /* 15.5:1 */
 }
 
 body.theme-neon-orange {
   --accent-primary: #ff5e00;
+  --accent-primary-rgb: 255, 94, 0;
   --accent-primary-dim: rgba(255, 94, 0, 0.15);
-  --accent-primary-hover: #e05300;
+  --accent-primary-hover: #ff7a2e;
+  --accent-text: #ff7a2e;    /* 7.6:1 */
+  --on-accent: #000000;      /* 6.8:1 */
 }
 
 body.theme-vibrant-blue {
   --accent-primary: #00d4ff;
+  --accent-primary-rgb: 0, 212, 255;
   --accent-primary-dim: rgba(0, 212, 255, 0.15);
-  --accent-primary-hover: #00b9e0;
+  --accent-primary-hover: #33ddff;
+  --accent-text: #00d4ff;    /* 11.2:1 */
+  --on-accent: #000000;      /* 11.9:1 */
 }
 
 body.theme-purple-neon {
   --accent-primary: #b500ff;
-  --accent-primary-dim: rgba(181, 0, 255, 0.15);
+  --accent-primary-rgb: 181, 0, 255;
+  --accent-primary-dim: rgba(181, 0, 255, 0.18);
   --accent-primary-hover: #9b00db;
+  --accent-text: #c77dff;    /* 7.4:1 (#b500ff solo daba 4.1:1) */
+  --on-accent: #ffffff;      /* 4.8:1 (negro solo daba 4.4:1) */
 }

@@ -58,7 +58,8 @@ export const RequireBuyerAuth = ({ children }: GuardProps) => {
 
 /**
  * Protects `/staff/*` routes. Redirects to `/staff/login` when the staff
- * session is missing or expired.
+ * session is missing or expired, and to `/staff/no-tenant` when the account
+ * has no tenant membership (it must not reach any staff screen).
  */
 export const RequireStaffAuth = ({ children }: GuardProps) => {
   const { session } = useAuthStaff();
@@ -70,6 +71,10 @@ export const RequireStaffAuth = ({ children }: GuardProps) => {
   const payload = decodeJwtPayload(session.accessToken);
   if (isExpired(payload)) {
     return <Navigate to="/staff/login" replace />;
+  }
+
+  if (!session.tenantId) {
+    return <Navigate to="/staff/no-tenant" replace />;
   }
 
   return <>{children}</>;
@@ -90,6 +95,9 @@ export const RequireTenantAdmin = ({ children }: GuardProps) => {
   const payload = decodeJwtPayload(session.accessToken);
   if (isExpired(payload)) {
     return <Navigate to="/staff/login" replace />;
+  }
+  if (!session.tenantId) {
+    return <Navigate to="/staff/no-tenant" replace />;
   }
   if (!session.role || !TENANT_ADMIN_ROLES.has(session.role)) {
     return <Navigate to="/staff/dashboard" replace />;

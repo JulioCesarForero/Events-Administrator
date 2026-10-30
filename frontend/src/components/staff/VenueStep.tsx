@@ -80,10 +80,10 @@ export const VenueStep = ({ wizardData, setWizardData, onNext, sessionToken }: P
                  onClick={() => mode === 'list' && handleSelect(v)}
                  style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', cursor: mode === 'list' ? 'pointer' : 'default' , border: wizardData.venueId === v.id ? '1px solid var(--accent-primary)' : ''}}
               >
-                 <MapPin color="var(--accent-primary)"/>
+                 <MapPin color="var(--accent-text)"/>
                  <div>
                     <strong>{v.name}</strong>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{v.address}</div>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{v.address}</div>
                  </div>
               </div>
             ))}
@@ -93,7 +93,7 @@ export const VenueStep = ({ wizardData, setWizardData, onNext, sessionToken }: P
         {/* Lado B: Creación */}
         <GlassCard style={{ opacity: mode === 'create' ? 1 : 0.6, transition: '0.3s' }} onClick={() => mode !== 'create' && setMode('create')}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
-            <Plus color="var(--accent-primary)"/> <h4>Crear Nuevo Salón</h4>
+            <Plus color="var(--accent-text)"/> <h4>Crear Nuevo Salón</h4>
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', pointerEvents: mode === 'create' ? 'auto' : 'none' }}>

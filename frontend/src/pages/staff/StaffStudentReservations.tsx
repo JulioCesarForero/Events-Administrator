@@ -23,12 +23,12 @@ const sectionStyle: React.CSSProperties = {
   borderRadius: 'var(--radius-sm)',
   padding: '10px 12px',
 };
-const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' };
+const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontWeight: 600, fontSize: 'var(--text-sm)' };
 
 const SummaryStat = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', background: 'rgba(255,255,255,0.04)' }}>
-    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{label}</div>
-    <div style={{ fontSize: '1.1rem', fontWeight: 600, marginTop: '2px' }}>{children}</div>
+    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{label}</div>
+    <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginTop: '2px' }}>{children}</div>
   </div>
 );
 
@@ -574,12 +574,12 @@ export const StaffStudentReservations = () => {
           <div>
             <h2 style={{ margin: 0 }}>Reservas por estudiante</h2>
             {isSuperAdmin ? (
-              <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <p style={{ margin: '4px 0 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                 Reporte venue (CSV): asistentes por estudiante, código de reserva y mesas para restaurante / sede.
               </p>
             ) : null}
             {isSuperAdmin ? (
-              <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <p style={{ margin: '4px 0 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                 Reporte pagos aprobados (CSV): responsable, estudiante, monto aprobado y totales de recaudo.
               </p>
             ) : null}
@@ -640,7 +640,7 @@ export const StaffStudentReservations = () => {
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }}>
         <GlassCard style={{ flex: '1 1 260px', maxWidth: '340px', minWidth: 0, padding: '16px' }}>
-          <h3 style={{ marginTop: 0, fontSize: '1rem' }}>
+          <h3 style={{ marginTop: 0, fontSize: 'var(--text-base)' }}>
             Resultados {rows.length ? <span style={{ color: 'var(--text-muted)' }}>({rows.length})</span> : null}
           </h3>
           {rows.length === 0 && !loading ? <p style={{ color: 'var(--text-secondary)' }}>Sin resultados.</p> : null}
@@ -663,10 +663,10 @@ export const StaffStudentReservations = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{r.studentCodeSnapshot}</div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>{r.studentCodeSnapshot}</div>
                   {r.displayName ? (
                     <div
-                      style={{ fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      style={{ fontSize: 'var(--text-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                       title={r.displayName}
                     >
                       {r.displayName}
@@ -674,7 +674,7 @@ export const StaffStudentReservations = () => {
                   ) : null}
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
                     <StatusBadge tone={statusTone(r.reservationStatus)}>{r.reservationStatus}</StatusBadge>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
                       {r.activeSpotsReserved}/{r.approvedTicketCount} cupos
                     </span>
                   </div>
@@ -686,7 +686,7 @@ export const StaffStudentReservations = () => {
 
         <GlassCard style={{ flex: '999 1 480px', minWidth: 0, padding: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>Detalle del grupo</h3>
+            <h3 style={{ margin: 0, fontSize: 'var(--text-base)' }}>Detalle del grupo</h3>
             {selectedGroupId ? (
               <Button size="sm" variant="outline" onClick={() => void loadDetail(selectedGroupId)} icon={RefreshCw}>
                 Actualizar
@@ -736,7 +736,7 @@ export const StaffStudentReservations = () => {
                       fontWeight: detailTab === t.id ? 600 : 400,
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
-                      fontSize: '0.85rem',
+                      fontSize: 'var(--text-sm)',
                     }}
                   >
                     {t.label}
@@ -746,7 +746,7 @@ export const StaffStudentReservations = () => {
 
               {detailTab === 'asistentes' ? (
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
                     <thead>
                       <tr style={{ color: 'var(--text-secondary)', textAlign: 'left' }}>
                         <th style={cellStyle}>Nombre</th>
@@ -824,10 +824,10 @@ export const StaffStudentReservations = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: 0 }}>
                           <StatusBadge tone={statusTone(rv.status)}>{rv.status}</StatusBadge>
-                          <span style={{ fontSize: '0.85rem' }}>{rv.totalSpotsReserved} cupos</span>
+                          <span style={{ fontSize: 'var(--text-sm)' }}>{rv.totalSpotsReserved} cupos</span>
                           <code
                             title={rv.reservationId}
-                            style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}
+                            style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
                           >
                             {rv.reservationId.slice(0, 8)}…
                           </code>
@@ -843,7 +843,7 @@ export const StaffStudentReservations = () => {
                           </div>
                         ) : null}
                       </div>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px', fontSize: '0.8rem' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px', fontSize: 'var(--text-sm)' }}>
                         {rv.lines.map((ln) => (
                           <span
                             key={ln.id}
@@ -853,7 +853,7 @@ export const StaffStudentReservations = () => {
                           </span>
                         ))}
                       </div>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px', fontSize: '0.8rem' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px', fontSize: 'var(--text-sm)' }}>
                         {detail.reservationCodes
                           .filter((c) => c.reservationId === rv.reservationId)
                           .map((c) => (
@@ -907,7 +907,7 @@ export const StaffStudentReservations = () => {
                     </div>
                     <Input label="Motivo" value={addReason} onChange={(e) => setAddReason(e.target.value)} />
                     {vacantCodes.length ? (
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+                      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', margin: '0 0 8px' }}>
                         Recibirá el código vacante {vacantCodes[0].reservationCode}.
                       </p>
                     ) : null}
@@ -940,12 +940,12 @@ export const StaffStudentReservations = () => {
                         onChange={(e) => setMoveReservationId(e.target.value)}
                       />
                       <Input label="Motivo" value={moveReason} onChange={(e) => setMoveReason(e.target.value)} />
-                      <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '4px' }}>Allocations (JSON)</label>
+                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', marginBottom: '4px' }}>Allocations (JSON)</label>
                       <textarea
                         value={moveJson}
                         onChange={(e) => setMoveJson(e.target.value)}
                         rows={5}
-                        style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.8rem', marginBottom: '8px' }}
+                        style={{ width: '100%', fontFamily: 'monospace', fontSize: 'var(--text-sm)', marginBottom: '8px' }}
                       />
                       <Button size="sm" variant="outline" onClick={() => void submitMove()}>
                         Mover
@@ -956,7 +956,7 @@ export const StaffStudentReservations = () => {
               ) : null}
 
               {detailTab === 'auditoria' ? (
-                <div style={{ maxHeight: '50vh', overflowY: 'auto', fontSize: '0.8rem' }}>
+                <div style={{ maxHeight: '50vh', overflowY: 'auto', fontSize: 'var(--text-sm)' }}>
                   {audit.length === 0 ? <p style={{ color: 'var(--text-secondary)' }}>Sin eventos.</p> : null}
                   {audit.map((log) => (
                     <details key={log.id} style={{ borderBottom: '1px solid var(--border-light)', padding: '6px 0' }}>
@@ -1005,7 +1005,7 @@ export const StaffStudentReservations = () => {
           <GlassCard style={{ maxWidth: '480px', width: '100%' }}>
             <h3>{editMode === 'replace' ? 'Reemplazar asistente' : 'Editar asistente'}</h3>
             {editMode === 'replace' ? (
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                 Reemplaza a {editParticipant.firstName} {editParticipant.lastName}.{' '}
                 {codeByParticipant.get(editParticipant.id)
                   ? `La nueva persona conservará el código ${codeByParticipant.get(editParticipant.id)} y su puesto en la mesa.`
@@ -1080,11 +1080,11 @@ export const StaffStudentReservations = () => {
         >
           <GlassCard style={{ maxWidth: '480px', width: '100%' }}>
             <h3>Eliminar asistente</h3>
-            <p style={{ fontSize: '0.9rem' }}>
+            <p style={{ fontSize: 'var(--text-sm)' }}>
               Se eliminará el registro de {deleteParticipant.firstName} {deleteParticipant.lastName}.
             </p>
             {codeByParticipant.get(deleteParticipant.id) ? (
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                 El código {codeByParticipant.get(deleteParticipant.id)} y su puesto en la mesa quedarán
                 vacantes y se asignarán al próximo asistente que agregues a este grupo.
               </p>

@@ -112,7 +112,7 @@ export const StaffManualAdjustments = () => {
 
       <GlassCard style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
-          <Settings2 color="var(--accent-primary)" />
+          <Settings2 color="var(--accent-text)" />
           <h3 style={{ margin: 0 }}>Selecciona la acción</h3>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
@@ -125,14 +125,14 @@ export const StaffManualAdjustments = () => {
                 padding: '14px',
                 borderRadius: 'var(--radius-md)',
                 border: `2px solid ${action === opt.key ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                background: action === opt.key ? 'rgba(57,255,20,0.1)' : 'transparent',
+                background: action === opt.key ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                 color: 'var(--text-primary)',
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
             >
-              <strong style={{ fontSize: '0.95rem' }}>{opt.label}</strong>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '6px 0 0' }}>
+              <strong style={{ fontSize: 'var(--text-base)' }}>{opt.label}</strong>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', margin: '6px 0 0' }}>
                 {opt.description}
               </p>
             </button>
@@ -184,7 +184,7 @@ export const StaffManualAdjustments = () => {
 
         {action === 'CUSTOM' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
               Payload (JSON)
             </label>
             <textarea
@@ -204,7 +204,7 @@ export const StaffManualAdjustments = () => {
               alignItems: 'center',
               marginTop: '12px',
               color: 'var(--error)',
-              fontSize: '0.875rem',
+              fontSize: 'var(--text-sm)',
             }}
           >
             <AlertTriangle size={16} /> {error}
@@ -217,8 +217,8 @@ export const StaffManualAdjustments = () => {
               gap: '8px',
               alignItems: 'center',
               marginTop: '12px',
-              color: 'var(--accent-primary)',
-              fontSize: '0.875rem',
+              color: 'var(--accent-text)',
+              fontSize: 'var(--text-sm)',
             }}
           >
             <CheckCircle2 size={16} /> {success}

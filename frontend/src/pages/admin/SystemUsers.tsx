@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { apiClient } from '../../api/client';
@@ -7,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 export const SystemUsers = () => {
   const { session } = useAuthStaff();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [users, setUsers] = useState<any[]>([]);
   const [tenantId, setTenantId] = useState<string>(session?.tenantId || '');
@@ -98,7 +100,13 @@ export const SystemUsers = () => {
   };
 
   const handleDelete = async (user: any) => {
-    if (!window.confirm(`¿Estás seguro de eliminar (desactivar) al usuario ${user.email}?`)) return;
+    const ok = await confirm({
+      title: 'Desactivar usuario',
+      message: `El usuario ${user.email} quedará desactivado y no podrá iniciar sesión.`,
+      confirmLabel: 'Desactivar',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await apiClient.delete(`/admin/users/${user.id}`, { token: session?.accessToken, isBearer: true });
       setMessage({ type: 'success', text: 'Usuario eliminado exitosamente' });
@@ -112,14 +120,14 @@ export const SystemUsers = () => {
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ margin: 0, color: 'var(--accent-primary)' }}>Administración Global de Usuarios</h2>
+          <h2 style={{ margin: 0, color: 'var(--accent-text)' }}>Administración Global de Usuarios</h2>
           <p style={{ color: 'var(--text-secondary)' }}>Módulo exclusivo para SUPER_ADMIN</p>
         </div>
         <Button variant="outline" onClick={() => navigate('/staff/dashboard')}>Volver</Button>
       </div>
 
       {message && (
-        <div style={{ padding: '12px', borderRadius: '4px', background: message.type === 'error' ? 'rgba(255, 0, 0, 0.1)' : 'rgba(0, 255, 0, 0.1)', color: message.type === 'error' ? '#ff4d4d' : '#4dff4d' }}>
+        <div style={{ padding: '12px', borderRadius: '4px', background: message.type === 'error' ? 'var(--error-dim)' : 'var(--success-dim)', color: message.type === 'error' ? 'var(--error)' : 'var(--success)' }}>
           {message.text}
         </div>
       )}
@@ -166,9 +174,9 @@ export const SystemUsers = () => {
                     <span style={{ 
                       padding: '4px 8px', 
                       borderRadius: '12px', 
-                      fontSize: '0.8rem',
-                      background: u.status === 'ACTIVE' ? 'rgba(0,255,0,0.1)' : 'rgba(255,0,0,0.1)',
-                      color: u.status === 'ACTIVE' ? '#4dff4d' : '#ff4d4d'
+                      fontSize: 'var(--text-sm)',
+                      background: u.status === 'ACTIVE' ? 'var(--success-dim)' : 'var(--error-dim)',
+                      color: u.status === 'ACTIVE' ? 'var(--success)' : 'var(--error)'
                     }}>
                       {u.status}
                     </span>
@@ -232,10 +240,10 @@ export const SystemUsers = () => {
           <GlassCard style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
             <h3 style={{ margin: 0 }}>Contraseña Reseteada</h3>
             <p>Se ha generado una nueva contraseña para {selectedUser?.email}</p>
-            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontFamily: 'monospace', fontSize: '1.2rem' }}>
+            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontFamily: 'monospace', fontSize: 'var(--text-xl)' }}>
               {tempPassword}
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
               Por favor copia esta contraseña y compártela de forma segura. No se volverá a mostrar.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>

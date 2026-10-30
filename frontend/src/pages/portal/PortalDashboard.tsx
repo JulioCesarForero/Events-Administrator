@@ -91,11 +91,11 @@ function paymentStepDetails(
 function badgeColor(tone: StepDef['badge'] extends infer B ? (B extends { tone: infer T } ? T : never) : never) {
   switch (tone) {
     case 'success':
-      return { bg: 'rgba(57,255,20,0.18)', fg: 'var(--accent-primary)' };
+      return { bg: 'var(--success-dim)', fg: 'var(--success)' };
     case 'warn':
-      return { bg: 'rgba(255,193,7,0.18)', fg: '#FFC107' };
+      return { bg: 'var(--warning-dim)', fg: 'var(--warning)' };
     case 'error':
-      return { bg: 'rgba(255,0,0,0.18)', fg: 'var(--error)' };
+      return { bg: 'var(--error-dim)', fg: 'var(--error)' };
     default:
       return { bg: 'rgba(255,255,255,0.08)', fg: 'var(--text-secondary)' };
   }
@@ -257,19 +257,19 @@ export const PortalDashboard = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <small style={{ color: 'var(--text-secondary)' }}>Código</small>
-            <div style={{ fontSize: '1.1rem' }}>
+            <div style={{ fontSize: 'var(--text-lg)' }}>
               <strong>{session.studentCode}</strong>
             </div>
           </div>
           <div>
             <small style={{ color: 'var(--text-secondary)' }}>Boletas aprobadas</small>
-            <div style={{ fontSize: '1.1rem' }}>
+            <div style={{ fontSize: 'var(--text-lg)' }}>
               <strong>{group?.approvedTicketCount ?? 0}</strong>
             </div>
           </div>
           <div>
             <small style={{ color: 'var(--text-secondary)' }}>En mesa / saldo</small>
-            <div style={{ fontSize: '1.1rem' }}>
+            <div style={{ fontSize: 'var(--text-lg)' }}>
               <strong>
                 {group?.approvedTicketCount != null && group.approvedTicketCount > 0
                   ? `${group?.activeSpotsReserved ?? 0} / ${group.approvedTicketCount} · libre: ${group?.availableReservationBalance ?? Math.max(0, (group?.approvedTicketCount ?? 0) - (group?.activeSpotsReserved ?? 0))}`
@@ -291,15 +291,15 @@ export const PortalDashboard = () => {
             const Icon = s.status === 'done' ? CheckCircle2 : s.status === 'active' ? Clock : Circle;
             const iconColor =
               s.status === 'done'
-                ? 'var(--accent-primary)'
+                ? 'var(--success)'
                 : s.status === 'active'
-                  ? '#FFC107'
+                  ? 'var(--warning)'
                   : 'var(--text-muted)';
             return (
               <GlassCard key={s.key} hoverEffect style={{ opacity: s.status === 'pending' ? 0.65 : 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Icon size={22} color={iconColor} />
-                  <h3 style={{ margin: 0, fontSize: '1.05rem' }}>{s.label}</h3>
+                  <h3 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>{s.label}</h3>
                 </div>
                 {s.badge && (
                   <span
@@ -308,7 +308,7 @@ export const PortalDashboard = () => {
                       marginTop: '8px',
                       padding: '3px 10px',
                       borderRadius: '999px',
-                      fontSize: '0.75rem',
+                      fontSize: 'var(--text-xs)',
                       fontWeight: 600,
                       background: badgeColor(s.badge.tone).bg,
                       color: badgeColor(s.badge.tone).fg,
@@ -319,7 +319,7 @@ export const PortalDashboard = () => {
                 )}
                 <p style={{ color: 'var(--text-secondary)', margin: '10px 0' }}>{s.description}</p>
                 {s.hint && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '6px 0 10px' }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', margin: '6px 0 10px' }}>
                     {s.hint}
                   </p>
                 )}

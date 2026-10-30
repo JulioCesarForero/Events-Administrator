@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useToast } from '../../components/ui/Toast';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { useAuthStaff } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
@@ -35,6 +37,8 @@ const LABELS: Record<DocType, string> = {
 
 export const StaffPolicies = () => {
   const { session } = useAuthStaff();
+  const confirm = useConfirm();
+  const toast = useToast();
   const { eventId } = useParams();
   const navigate = useNavigate();
 
@@ -154,7 +158,12 @@ export const StaffPolicies = () => {
 
   const publish = async (doc: LegalDoc) => {
     if (!session) return;
-    if (!window.confirm(`¿Publicar ${doc.title} (${doc.versionLabel})?`)) return;
+    const ok = await confirm({
+      title: 'Publicar documento',
+      message: `${doc.title} (${doc.versionLabel}) quedará visible para los estudiantes del evento.`,
+      confirmLabel: 'Publicar',
+    });
+    if (!ok) return;
     setActionLoading(true);
     setError('');
     try {
@@ -185,11 +194,11 @@ export const StaffPolicies = () => {
         },
         { token: session.accessToken, isBearer: true }
       );
-      alert('Configuración guardada exitosamente');
+      toast.success('Configuración guardada');
       loadConfig();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'No se pudo guardar la configuración';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setConfigSaving(false);
     }
@@ -274,13 +283,13 @@ export const StaffPolicies = () => {
                       display: 'inline-block',
                       padding: '2px 8px',
                       borderRadius: '999px',
-                      fontSize: '0.7rem',
+                      fontSize: 'var(--text-xs)',
                       fontWeight: 700,
                       background:
                         d.status === 'PUBLISHED'
-                          ? 'rgba(57,255,20,0.15)'
-                          : 'rgba(255,193,7,0.15)',
-                      color: d.status === 'PUBLISHED' ? 'var(--accent-primary)' : '#FFC107',
+                          ? 'var(--success-dim)'
+                          : 'var(--warning-dim)',
+                      color: d.status === 'PUBLISHED' ? 'var(--success)' : 'var(--warning)',
                     }}
                   >
                     {d.status}
@@ -331,7 +340,7 @@ export const StaffPolicies = () => {
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
                 Instrucciones de Pago (Canales autorizados)
               </label>
               <textarea
@@ -378,7 +387,7 @@ export const StaffPolicies = () => {
             onChange={(e) => setForm({ ...form, versionLabel: e.target.value })}
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
               Contenido (Markdown)
             </label>
             <textarea

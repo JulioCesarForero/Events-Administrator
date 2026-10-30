@@ -159,7 +159,7 @@ export const LegalViewerModal = ({
           <>
             <div
               style={{
-                fontSize: '0.8rem',
+                fontSize: 'var(--text-sm)',
                 color: 'var(--text-muted)',
                 marginBottom: '12px',
               }}

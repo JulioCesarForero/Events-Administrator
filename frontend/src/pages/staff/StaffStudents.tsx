@@ -7,6 +7,8 @@ import { apiClient } from '../../api/client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, UploadCloud, Edit2, Trash2, Plus, Search } from 'lucide-react';
 import { useGCSUpload } from '../../hooks/useGCSUpload';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
+import { useToast } from '../../components/ui/Toast';
 
 type StudentSummaryOut = {
   attendeeGroupId: string | null;
@@ -35,6 +37,8 @@ type StudentSummaryOut = {
 
 export const StaffStudents = () => {
   const { session } = useAuthStaff();
+  const confirm = useConfirm();
+  const toast = useToast();
   const { eventId } = useParams();
   const navigate = useNavigate();
   const { uploadFile, isUploading } = useGCSUpload();
@@ -88,12 +92,18 @@ export const StaffStudents = () => {
   // --- CRUD Actions ---
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Seguro que deseas eliminar este estudiante? Es una acción irreversible.')) return;
+    const ok = await confirm({
+      title: 'Eliminar estudiante',
+      message: 'Esta acción es irreversible.',
+      confirmLabel: 'Eliminar',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await apiClient.delete(`/events/${eventId}/students/${id}`, { token: session?.accessToken, isBearer: true });
       loadStudents();
     } catch (err: any) {
-      alert(`Error eliminando registro: ${err?.message || 'Desconocido'}`);
+      toast.error(err?.message || 'Error desconocido', 'No se pudo eliminar el registro');
     }
   };
 
@@ -133,7 +143,7 @@ export const StaffStudents = () => {
       }
       setShowEditModal(false);
     } catch (err: any) {
-      alert(`Error guardando estudiante: ${err?.message || 'Revisa conexión'}`);
+      toast.error(err?.message || 'Revisa la conexión', 'No se pudo guardar el estudiante');
     }
   };
 
@@ -164,7 +174,7 @@ export const StaffStudents = () => {
       }).filter(r => r.studentCode);
       
       if (rows.length === 0) {
-        alert(`No se detectaron datos. Verifica cabeceras y separador "${delimiter}".`);
+        toast.warn(`Verifica cabeceras y separador "${delimiter}".`, 'No se detectaron datos');
       }
       setParsedRows(rows);
     };
@@ -195,9 +205,9 @@ export const StaffStudents = () => {
       setFileToUpload(null);
       setParsedRows([]);
       loadStudents(); // Recargar grid
-      alert('Importación realizada exitosamente');
+      toast.success('Importación realizada');
     } catch (err: any) {
-      alert(`Error en importación masiva: ${err?.message || ''}`);
+      toast.error(err?.message || 'Error desconocido', 'Error en la importación masiva');
     } finally {
       setLoading(false);
     }
@@ -309,11 +319,11 @@ export const StaffStudents = () => {
 
                 if (std.flags.isOverbooked) {
                   badgeText = 'Inconsistente';
-                  badgeClass = '#ff4d4d'; // Rojo claro
+                  badgeClass = 'var(--error)'; // Rojo claro
                   badgeBg = 'rgba(255, 77, 77, 0.1)';
                 } else if (std.flags.pendingAction) {
                   badgeText = 'Pendiente';
-                  badgeClass = '#ffc107'; // Amarillo
+                  badgeClass = 'var(--warning)'; // Amarillo
                   badgeBg = 'rgba(255, 193, 7, 0.1)';
                 } else if (std.flags.hasApprovedPayment) {
                   badgeText = 'Aprobado';
@@ -327,8 +337,8 @@ export const StaffStudents = () => {
                     <td style={{ padding: '12px 16px' }}>{std.studentName}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ color: 'var(--success)' }}>{std.tickets.approved}</span> /&nbsp;
-                      <span style={{ color: '#ffc107' }}>{std.tickets.pending}</span> /&nbsp;
-                      <span style={{ color: '#ff4d4d' }}>{std.tickets.rejected}</span>
+                      <span style={{ color: 'var(--warning)' }}>{std.tickets.pending}</span> /&nbsp;
+                      <span style={{ color: 'var(--error)' }}>{std.tickets.rejected}</span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       {std.reservations.count} res / {std.reservations.spotsReserved} cupos
@@ -338,7 +348,7 @@ export const StaffStudents = () => {
                         display: 'inline-block',
                         padding: '4px 8px',
                         borderRadius: '4px',
-                        fontSize: '0.8rem',
+                        fontSize: 'var(--text-sm)',
                         fontWeight: '500',
                         color: badgeClass,
                         backgroundColor: badgeBg
@@ -348,10 +358,10 @@ export const StaffStudents = () => {
                     </td>
                     {isAdmin && (
                       <td style={{ padding: '12px 16px', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                        <button onClick={() => handleOpenEdit(std)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)' }} title="Editar">
+                        <button onClick={() => handleOpenEdit(std)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-text)' }} title="Editar">
                           <Edit2 size={18} />
                         </button>
-                        <button onClick={() => handleDelete(std.studentRecordId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ff4d4d' }} title="Eliminar">
+                        <button onClick={() => handleDelete(std.studentRecordId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--error)' }} title="Eliminar">
                           <Trash2 size={18} />
                         </button>
                       </td>
@@ -391,8 +401,8 @@ export const StaffStudents = () => {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <GlassCard style={{ width: '100%', maxWidth: '500px', padding: '24px' }}>
             <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Importación Masiva de Estudiantes</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '0.9rem' }}>
-              Sube el archivo CSV con las columnas <code style={{color:'var(--accent-primary)'}}>codigo_unico</code>, <code style={{color:'var(--accent-primary)'}}>apellidos</code>, y <code style={{color:'var(--accent-primary)'}}>nombres</code>.
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: 'var(--text-sm)' }}>
+              Sube el archivo CSV con las columnas <code style={{color:'var(--accent-text)'}}>codigo_unico</code>, <code style={{color:'var(--accent-text)'}}>apellidos</code>, y <code style={{color:'var(--accent-text)'}}>nombres</code>.
             </p>
 
             <div style={{ border: '2px dashed var(--border-light)', borderRadius: 'var(--radius-md)', padding: '32px', textAlign: 'center', marginBottom: '24px' }}>
@@ -403,7 +413,7 @@ export const StaffStudents = () => {
                 {fileToUpload ? fileToUpload.name : 'Seleccionar Archivo'}
               </Button>
               {parsedRows.length > 0 && (
-                <p style={{ color: 'var(--accent-primary)', marginTop: '12px', fontSize: '0.85rem' }}>
+                <p style={{ color: 'var(--accent-text)', marginTop: '12px', fontSize: 'var(--text-sm)' }}>
                   A procesar: {parsedRows.length} estudiantes.
                 </p>
               )}

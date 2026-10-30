@@ -88,7 +88,7 @@ export const LayoutStep = ({ wizardData, setWizardData, onNext, onPrev, sessionT
         <GlassCard style={{ opacity: mode === 'list' ? 1 : 0.6, transition: '0.3s' }} onClick={() => setMode('list')}>
           <h4>Planos Anteriores</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
-            {layouts.length === 0 ? <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>No hay Planos definidos para este salón.</p> : null}
+            {layouts.length === 0 ? <p style={{color: 'var(--text-secondary)', fontSize: 'var(--text-sm)'}}>No hay Planos definidos para este salón.</p> : null}
             {layouts.map(l => (
               <div 
                  key={l.id} 
@@ -96,7 +96,7 @@ export const LayoutStep = ({ wizardData, setWizardData, onNext, onPrev, sessionT
                  onClick={() => mode === 'list' && handleSelect(l)}
                  style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', cursor: mode === 'list' ? 'pointer' : 'default'  }}
               >
-                 <LayoutGrid color="var(--accent-primary)"/>
+                 <LayoutGrid color="var(--accent-text)"/>
                  <strong>{l.name}</strong>
               </div>
             ))}
@@ -106,7 +106,7 @@ export const LayoutStep = ({ wizardData, setWizardData, onNext, onPrev, sessionT
         {/* Lado B: Creación */}
         <GlassCard style={{ opacity: mode === 'create' ? 1 : 0.6, transition: '0.3s' }} onClick={() => mode !== 'create' && setMode('create')}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
-            <Plus color="var(--accent-primary)"/> <h4>Nuevo Layout (Auto-Mesas)</h4>
+            <Plus color="var(--accent-text)"/> <h4>Nuevo Layout (Auto-Mesas)</h4>
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', pointerEvents: mode === 'create' ? 'auto' : 'none' }}>
@@ -117,7 +117,7 @@ export const LayoutStep = ({ wizardData, setWizardData, onNext, onPrev, sessionT
                <Input label="Cupos x Mesa (Capacidad)" type="number" min="2" max="25" value={cupsPerTable} onChange={e=>setCupsPerTable(parseInt(e.target.value)||2)} />
              </div>
              
-             <div className="glass-panel" style={{ padding: '16px', fontSize: '0.85rem' }}>
+             <div className="glass-panel" style={{ padding: '16px', fontSize: 'var(--text-sm)' }}>
                 Tu Evento tendrá <strong>{tableCount * cupsPerTable} cupos</strong> reservables distribuidos uniformemente.
              </div>
 

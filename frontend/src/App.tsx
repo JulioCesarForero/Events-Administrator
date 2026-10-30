@@ -14,6 +14,7 @@ import { PortalMyReservations } from './pages/portal/PortalMyReservations';
 import { PortalPaymentStatus } from './pages/portal/PortalPaymentStatus';
 import { PortalLanding } from './pages/portal/PortalLanding';
 import { StaffLogin } from './pages/staff/StaffLogin';
+import { StaffNoTenant } from './pages/staff/StaffNoTenant';
 import { StaffDashboard } from './pages/staff/StaffDashboard';
 import { StaffPayments } from './pages/staff/StaffPayments';
 import { StaffStudents } from './pages/staff/StaffStudents';
@@ -57,9 +58,10 @@ function ThemeSelector() {
         title="Cambiar tema"
         onClick={() => setOpen((v) => !v)}
         className="glass-panel"
+        aria-expanded={open}
         style={{
-          width: '42px',
-          height: '42px',
+          width: 'var(--target-min)',
+          height: 'var(--target-min)',
           borderRadius: '50%',
           border: 'none',
           cursor: 'pointer',
@@ -70,39 +72,58 @@ function ThemeSelector() {
           padding: 0,
         }}
       >
-        <Palette size={20} />
+        <Palette size={20} aria-hidden="true" />
       </button>
       {open && (
         <div
+          role="group"
+          aria-label="Temas disponibles"
           className="glass-panel animate-slide-up"
           style={{
             position: 'absolute',
-            bottom: '52px',
+            bottom: '54px',
             right: 0,
-            padding: '10px',
+            padding: 'var(--space-1)',
             display: 'flex',
-            gap: '8px',
+            gap: 0,
             borderRadius: 'var(--radius-full)',
           }}
         >
           {themes.map((t) => (
             <button
               key={t.id}
+              type="button"
               onClick={() => {
                 setTheme(t.id);
                 setOpen(false);
               }}
               title={t.name}
               aria-label={`Tema ${t.name}`}
+              aria-pressed={theme === t.id}
               style={{
-                width: '24px',
-                height: '24px',
+                width: 'var(--target-min)',
+                height: 'var(--target-min)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                border: 'none',
                 borderRadius: '50%',
-                backgroundColor: t.color,
-                border: theme === t.id ? '2px solid white' : '2px solid transparent',
                 cursor: 'pointer',
+                padding: 0,
               }}
-            />
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  backgroundColor: t.color,
+                  boxShadow: theme === t.id ? '0 0 0 2px var(--bg-dark), 0 0 0 4px #ffffff' : 'none',
+                }}
+              />
+            </button>
           ))}
         </div>
       )}
@@ -175,7 +196,7 @@ const PortalLayout = ({ children }: { children: React.ReactNode }) => {
       <div className="glow-orb" style={{ top: '10%', left: '20%' }} />
       <div className="glow-orb" style={{ bottom: '20%', right: '10%', animationDelay: '2s' }} />
       <header className="glass-panel" style={{ padding: '20px', margin: '20px', borderRadius: 'var(--radius-lg)' }}>
-        <h2 style={{ margin: 0, color: 'var(--accent-primary)' }}>Portal de Eventos</h2>
+        <h2 style={{ margin: 0, color: 'var(--accent-text)' }}>Portal de Eventos</h2>
       </header>
       <main style={{ padding: '0 20px 40px' }}>
         {children}
@@ -190,7 +211,7 @@ const StaffLayout = ({ children }: { children: React.ReactNode }) => (
   <div className="animate-fade-in" style={{ minHeight: '100vh', display: 'flex' }}>
     <aside className="glass-panel" style={{ width: '250px', borderRight: '1px solid var(--border-light)', borderRadius: 0 }}>
       <div style={{ padding: '24px' }}>
-        <h3 style={{ color: 'var(--accent-primary)' }}>Events Staff</h3>
+        <h3 style={{ color: 'var(--accent-text)' }}>Events Staff</h3>
       </div>
     </aside>
     <main style={{ flex: 1, padding: '24px' }}>
@@ -238,6 +259,7 @@ export default function App() {
           <StaffLayout>
             <Routes>
               <Route path="login" element={<StaffLogin />} />
+              <Route path="no-tenant" element={<StaffNoTenant />} />
               <Route path="dashboard" element={<RequireStaffAuth><StaffDashboard /></RequireStaffAuth>} />
               <Route path="events/new" element={<RequireStaffAuth><StaffEventWizard /></RequireStaffAuth>} />
               <Route path="events/:eventId/payments" element={<RequireStaffAuth><StaffPayments /></RequireStaffAuth>} />

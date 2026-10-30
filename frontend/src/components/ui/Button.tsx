@@ -2,23 +2,24 @@ import type { ButtonHTMLAttributes, CSSProperties } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   icon?: LucideIcon;
   isLoading?: boolean;
 }
 
 const SIZE_STYLE: Record<'sm' | 'md' | 'lg', CSSProperties> = {
-  sm: { padding: '8px 16px', fontSize: '0.875rem' },
-  md: { padding: '12px 24px', fontSize: '1rem' },
-  lg: { padding: '16px 32px', fontSize: '1.125rem' },
+  sm: { padding: '8px 16px', fontSize: 'var(--text-sm)' },
+  md: { padding: '12px 24px', fontSize: 'var(--text-base)' },
+  lg: { padding: '16px 32px', fontSize: 'var(--text-lg)' },
 };
 
 const VARIANT_CLASS: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary: 'btn-primary',
   secondary: 'btn-secondary',
-  outline: 'btn-secondary btn-outline',
-  ghost: 'btn-secondary btn-ghost',
+  outline: 'btn-outline',
+  ghost: 'btn-ghost',
+  danger: 'btn-danger',
 };
 
 export const Button: React.FC<ButtonProps> = ({
@@ -36,9 +37,10 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
-      className={`btn ${VARIANT_CLASS[variant]} ${className}`}
+      className={`btn ${VARIANT_CLASS[variant]}${size === 'sm' ? ' btn-sm' : ''} ${className}`}
       style={{ ...SIZE_STYLE[size], ...style }}
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       {...props}
     >
       {isLoading && (
@@ -56,7 +58,7 @@ export const Button: React.FC<ButtonProps> = ({
           }}
         />
       )}
-      {!isLoading && Icon && <Icon size={iconSize} />}
+      {!isLoading && Icon && <Icon size={iconSize} aria-hidden="true" />}
       {children}
     </button>
   );

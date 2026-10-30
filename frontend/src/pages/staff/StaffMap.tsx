@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useToast } from '../../components/ui/Toast';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { useAuthStaff } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { apiClient } from '../../api/client';
@@ -11,6 +13,8 @@ import type { MapTable } from '../../api/types';
 
 export const StaffMap = () => {
   const { session } = useAuthStaff();
+  const confirm = useConfirm();
+  const toast = useToast();
   const navigate = useNavigate();
   const { eventId } = useParams();
   
@@ -98,7 +102,7 @@ export const StaffMap = () => {
       } as MapTable]);
     } catch (err) {
       console.error("Error creando objeto", err);
-      alert("Error al crear el objeto");
+      toast.error("No se pudo crear el objeto");
     }
   };
 
@@ -160,7 +164,13 @@ export const StaffMap = () => {
     if (!layoutId || !session) return;
     const tId = table.id || table.layoutTableId;
     
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar ${table.code}?`)) return;
+    const ok = await confirm({
+      title: 'Eliminar objeto',
+      message: `Se eliminará ${table.code} del plano.`,
+      confirmLabel: 'Eliminar',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await apiClient.delete(
@@ -170,7 +180,7 @@ export const StaffMap = () => {
       setTables(prev => prev.filter(t => (t.id || t.layoutTableId) !== tId));
     } catch (err) {
       console.error("Error eliminando objeto", err);
-      alert("Error eliminando el objeto");
+      toast.error("No se pudo eliminar el objeto");
     }
   };
 
@@ -222,10 +232,10 @@ export const StaffMap = () => {
           { token: session.accessToken, isBearer: true }
         );
         setBackgroundImageUrl(res.backgroundImageUrl || uploaded.fileUrl);
-        alert("Fondo actualizado correctamente");
+        toast.success("Fondo actualizado correctamente");
       } catch (err) {
         console.error("Error subiendo fondo", err);
-        alert("Error al subir la imagen de fondo");
+        toast.error("No se pudo subir la imagen de fondo");
       } finally {
         setLoading(false);
       }
@@ -254,8 +264,8 @@ export const StaffMap = () => {
           <GlassCard style={{ padding: '0', overflow: 'hidden', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.1)' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Plano y Distribución</h3>
-                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--text-xl)' }}>Plano y Distribución</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                   {previewMode ? 'Modo de visualización de usuario final.' : 'Arrastra mesas, alinea, renombra dando click e invéntate la mejor experiencia.'}
                 </p>
               </div>
@@ -266,9 +276,9 @@ export const StaffMap = () => {
                     padding: '8px 12px',
                     borderRadius: 'var(--radius-md)',
                     border: `1px solid ${previewMode ? 'var(--accent-primary)' : 'var(--border-focus)'}`,
-                    background: previewMode ? 'rgba(57,255,20,0.1)' : 'transparent',
-                    color: previewMode ? 'var(--accent-primary)' : 'var(--text-primary)',
-                    fontSize: '0.85rem',
+                    background: previewMode ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
+                    color: previewMode ? 'var(--accent-text)' : 'var(--text-primary)',
+                    fontSize: 'var(--text-sm)',
                     fontWeight: 'bold',
                     cursor: 'pointer'
                   }}
@@ -302,7 +312,7 @@ export const StaffMap = () => {
             <GlassCard>
               <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Herramientas de Edición</h3>
               
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Da click aquí para añadir un objeto:</label>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Da click aquí para añadir un objeto:</label>
               <select 
                 onChange={(e) => { addLayoutObject(e.target.value); e.target.value = ''; }}
                 style={{
@@ -336,7 +346,7 @@ export const StaffMap = () => {
                 {isUploading ? 'Subiendo...' : 'Subir Fondo de Plano'}
               </Button>
 
-              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '12px', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', border: '1px solid rgba(59, 130, 246, 0.3)', marginTop: '20px', color: '#93C5FD' }}>
+              <div style={{ background: 'var(--info-dim)', padding: '12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', border: '1px solid rgba(96, 165, 250, 0.35)', marginTop: '20px', color: 'var(--info)' }}>
                 <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Info size={16} /> Instucciones de Edición</strong>
                 <p style={{ margin: '8px 0 0' }}>Puedes hacer click en una mesa para <strong>eliminarla</strong> o <strong>renombrarla</strong>. Para mover o distribuir múltiples mesas, arrastra tu mouse sobre un área vacía y sombreadlo para seleccionar todas, luego presiona los botones de las herramientas arriba.</p>
               </div>
@@ -351,15 +361,15 @@ export const StaffMap = () => {
              </div>
              
              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                   <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(34, 197, 94, 0.35)', border: '2px solid rgba(34, 197, 94, 1)' }}></div>
                   Mesa Disponible
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                   <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(234, 179, 8, 0.35)', border: '2px solid rgba(234, 179, 8, 1)' }}></div>
                   Mesa Parcialmente Ocupada
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                   <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.35)', border: '2px solid rgba(239, 68, 68, 1)' }}></div>
                   Mesa Llena / Ocupada
                 </div>

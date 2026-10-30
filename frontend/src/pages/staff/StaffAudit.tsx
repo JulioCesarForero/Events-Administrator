@@ -120,7 +120,7 @@ export const StaffAudit = () => {
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Actor</label>
+          <label style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Actor</label>
           <select
             className="glass-input"
             value={actorFilter}
@@ -163,7 +163,7 @@ export const StaffAudit = () => {
               )}
               {filtered.map((r) => (
                 <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                  <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: 'var(--text-sm)' }}>
                     {new Date(r.occurredAt).toLocaleString()}
                   </td>
                   <td style={{ padding: '10px 12px' }}>{r.actorType}</td>
@@ -174,9 +174,9 @@ export const StaffAudit = () => {
                     )}
                   </td>
                   <td style={{ padding: '10px 12px' }}>
-                    <code style={{ color: 'var(--accent-primary)' }}>{r.action}</code>
+                    <code style={{ color: 'var(--accent-text)' }}>{r.action}</code>
                   </td>
-                  <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                     {r.payloadJson ? JSON.stringify(r.payloadJson).slice(0, 140) : '—'}
                   </td>
                 </tr>

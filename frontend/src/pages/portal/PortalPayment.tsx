@@ -297,10 +297,10 @@ export const PortalPayment = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 'bold',
-                fontSize: '0.875rem',
+                fontSize: 'var(--text-sm)',
                 background:
                   step > n ? 'var(--success)' : step === n ? 'var(--accent-primary)' : 'var(--border-light)',
-                color: step >= n ? '#000' : 'var(--text-muted)',
+                color: step > n ? 'var(--on-status)' : step === n ? 'var(--on-accent)' : 'var(--text-muted)',
               }}
             >
               {step > n ? <CheckCircle size={18} /> : n}
@@ -317,7 +317,7 @@ export const PortalPayment = () => {
             )}
           </div>
         ))}
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: '8px' }}>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginLeft: '8px' }}>
           {step === 1
             ? 'Datos del pago'
             : step === 2
@@ -344,7 +344,7 @@ export const PortalPayment = () => {
                 padding: '16px',
                 borderRadius: 'var(--radius-md)',
                 border: `2px solid ${paymentType === 'DIGITAL' ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                background: paymentType === 'DIGITAL' ? 'rgba(57,255,20,0.1)' : 'transparent',
+                background: paymentType === 'DIGITAL' ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                 color: 'var(--text-primary)',
                 cursor: 'pointer',
                 textAlign: 'left',
@@ -362,7 +362,7 @@ export const PortalPayment = () => {
                 padding: '16px',
                 borderRadius: 'var(--radius-md)',
                 border: `2px solid ${paymentType === 'CASH' ? 'var(--accent-primary)' : 'var(--border-light)'}`,
-                background: paymentType === 'CASH' ? 'rgba(57,255,20,0.1)' : 'transparent',
+                background: paymentType === 'CASH' ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                 color: 'var(--text-primary)',
                 cursor: 'pointer',
                 textAlign: 'left',
@@ -394,7 +394,7 @@ export const PortalPayment = () => {
               }}
             >
               <span>Total a pagar:</span>
-              <strong style={{ fontSize: '1.25rem', color: 'var(--accent-primary)' }}>
+              <strong style={{ fontSize: 'var(--text-xl)', color: 'var(--accent-text)' }}>
                 ${(ticketQuantity * ticketPrice).toLocaleString('es-CO')} COP
               </strong>
             </div>
@@ -402,7 +402,7 @@ export const PortalPayment = () => {
             {paymentType === 'DIGITAL' ? (
               <div
                 className="glass-panel"
-                style={{ padding: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}
+                style={{ padding: '16px', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}
               >
                 <strong style={{ color: 'var(--text-primary)' }}>Datos bancarios:</strong>
                 {paymentInstructions ? (
@@ -423,7 +423,7 @@ export const PortalPayment = () => {
                 className="glass-panel"
                 style={{
                   padding: '16px',
-                  fontSize: '0.9rem',
+                  fontSize: 'var(--text-sm)',
                   color: 'var(--text-secondary)',
                   lineHeight: 1.6,
                   display: 'flex',
@@ -431,7 +431,7 @@ export const PortalPayment = () => {
                   alignItems: 'flex-start',
                 }}
               >
-                <Info size={20} color="var(--accent-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <Info size={20} color="var(--accent-text)" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div>
                   Paga en la ventanilla del comité. Solicita el recibo de pago y súbelo aquí en el siguiente paso
                   (foto o PDF), igual que el comprobante de transferencia.
@@ -479,7 +479,7 @@ export const PortalPayment = () => {
                 <Upload
                   size={48}
                   style={{
-                    color: selectedFile ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    color: selectedFile ? 'var(--accent-text)' : 'var(--text-muted)',
                     marginBottom: '16px',
                   }}
                 />
@@ -499,7 +499,7 @@ export const PortalPayment = () => {
           />
 
           {selectedFile && !filePreview && (
-            <p style={{ color: 'var(--accent-primary)', marginBottom: '16px', fontSize: '0.9rem' }}>
+            <p style={{ color: 'var(--accent-text)', marginBottom: '16px', fontSize: 'var(--text-sm)' }}>
               {selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)
             </p>
           )}
@@ -507,7 +507,7 @@ export const PortalPayment = () => {
           {resumePaymentId && (
             <p
               style={{
-                fontSize: '0.85rem',
+                fontSize: 'var(--text-sm)',
                 color: 'var(--text-secondary)',
                 marginBottom: '12px',
               }}

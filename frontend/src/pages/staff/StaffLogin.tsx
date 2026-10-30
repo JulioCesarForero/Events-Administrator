@@ -43,8 +43,8 @@ export const StaffLogin = () => {
         eventAssignments
       });
 
-      if (!tenantId && eventAssignments.length > 0) {
-        navigate(`/staff/events/${eventAssignments[0].eventId}/dashboard`);
+      if (!tenantId) {
+        navigate('/staff/no-tenant', { replace: true });
       } else {
         navigate(`/staff/dashboard`);
       }

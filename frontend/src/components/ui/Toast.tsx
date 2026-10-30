@@ -22,9 +22,9 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const TONE_CONFIG: Record<ToastTone, { color: string; Icon: typeof Info }> = {
-  info: { color: '#00D4FF', Icon: Info },
-  success: { color: 'var(--accent-primary)', Icon: CheckCircle2 },
-  warn: { color: '#FFC107', Icon: AlertTriangle },
+  info: { color: 'var(--info)', Icon: Info },
+  success: { color: 'var(--success)', Icon: CheckCircle2 },
+  warn: { color: 'var(--warning)', Icon: AlertTriangle },
   error: { color: 'var(--error)', Icon: XCircle },
 };
 
@@ -84,24 +84,21 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 alignItems: 'flex-start',
               }}
             >
-              <Icon size={18} color={color} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <Icon size={18} color={color} aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div style={{ flex: 1 }}>
                 {t.title && <strong style={{ display: 'block' }}>{t.title}</strong>}
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
                   {t.message}
                 </div>
               </div>
               <button
                 aria-label="Cerrar notificación"
+                type="button"
+                className="icon-btn"
                 onClick={() => remove(t.id)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-muted)',
-                }}
+                style={{ margin: '-12px -10px -12px 0' }}
               >
-                <X size={16} />
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
           );

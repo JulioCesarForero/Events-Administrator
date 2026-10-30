@@ -217,7 +217,7 @@ export const StaffPayments = () => {
       <GlassCard style={{ marginBottom: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', alignItems: 'end' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
               Buscar estudiante o grupo
             </label>
             <input
@@ -228,7 +228,7 @@ export const StaffPayments = () => {
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Estado</label>
+            <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Estado</label>
             <select
               className="glass-input"
               value={statusFilter}
@@ -241,7 +241,7 @@ export const StaffPayments = () => {
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Tipo de pago</label>
+            <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Tipo de pago</label>
             <select
               className="glass-input"
               value={typeFilter}
@@ -253,7 +253,7 @@ export const StaffPayments = () => {
             </select>
           </div>
         </div>
-        <div style={{ marginTop: '10px', color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ marginTop: '10px', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Filter size={14} />
           Mostrando {visiblePayments.length} resultado(s)
         </div>
@@ -265,7 +265,7 @@ export const StaffPayments = () => {
             <AlertTriangle color="var(--error)" />
             <div>
               <strong>No se pudo cargar la bandeja</strong>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{loadError}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{loadError}</div>
             </div>
           </div>
         </GlassCard>
@@ -290,7 +290,7 @@ export const StaffPayments = () => {
               <h4 style={{ margin: '0 0 8px 0' }}>
                 {p.displayName || p.studentCodeSnapshot || `Grupo ${p.attendeeGroupId.slice(0, 8)}…`}
               </h4>
-              <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: '0.875rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', flexWrap: 'wrap' }}>
                 {p.studentCodeSnapshot && <span>Código: <strong>{p.studentCodeSnapshot}</strong></span>}
                 <span>Estado: <strong>{p.status}</strong></span>
                 <span>Tipo: <strong>{p.paymentType}</strong></span>
@@ -323,7 +323,7 @@ export const StaffPayments = () => {
                     Rechazar
                   </Button>
                   <Button
-                    style={{ background: 'var(--success)', color: '#000', boxShadow: 'none' }}
+                    style={{ background: 'var(--success)', color: 'var(--on-status)', boxShadow: 'none' }}
                     icon={Check}
                     onClick={() => openApprove(p)}
                   >
@@ -425,12 +425,12 @@ export const StaffPayments = () => {
                           }}
                         >
                           <FileText size={16} />
-                          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+                          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                             {ev.fileName || ev.evidenceType}
                           </span>
                         </div>
                         <span
-                          style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
+                          style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}
                         >
                           {ev.mimeType || 'desconocido'}
                           {ev.sizeBytes ? ` · ${formatSize(ev.sizeBytes)}` : ''}
@@ -476,7 +476,7 @@ export const StaffPayments = () => {
                           display: 'flex',
                           gap: '12px',
                           alignItems: 'center',
-                          fontSize: '0.8rem',
+                          fontSize: 'var(--text-sm)',
                         }}
                       >
                         <a
@@ -487,7 +487,7 @@ export const StaffPayments = () => {
                             display: 'inline-flex',
                             gap: '6px',
                             alignItems: 'center',
-                            color: 'var(--accent-primary)',
+                            color: 'var(--accent-text)',
                           }}
                         >
                           <ExternalLink size={14} /> Abrir / descargar
@@ -496,7 +496,7 @@ export const StaffPayments = () => {
                           <code
                             style={{
                               color: 'var(--text-muted)',
-                              fontSize: '0.75rem',
+                              fontSize: 'var(--text-xs)',
                               wordBreak: 'break-all',
                             }}
                             title="Ruta canónica del objeto en storage"
@@ -531,7 +531,7 @@ export const StaffPayments = () => {
               style={{
                 color: 'var(--text-muted)',
                 margin: 0,
-                fontSize: '0.85rem',
+                fontSize: 'var(--text-sm)',
                 lineHeight: 1.45,
               }}
             >
@@ -549,7 +549,7 @@ export const StaffPayments = () => {
               onChange={(e) => setApprovedTicketCount(parseInt(e.target.value) || 0)}
             />
             {actionError && (
-              <p style={{ color: 'var(--error)', fontSize: '0.85rem' }}>{actionError}</p>
+              <p style={{ color: 'var(--error)', fontSize: 'var(--text-sm)' }}>{actionError}</p>
             )}
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <Button variant="secondary" onClick={closeDrawer} disabled={actionLoading}>
@@ -577,7 +577,7 @@ export const StaffPayments = () => {
               onChange={(e) => setRejectReason(e.target.value)}
             />
             {actionError && (
-              <p style={{ color: 'var(--error)', fontSize: '0.85rem' }}>{actionError}</p>
+              <p style={{ color: 'var(--error)', fontSize: 'var(--text-sm)' }}>{actionError}</p>
             )}
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <Button variant="secondary" onClick={closeDrawer} disabled={actionLoading}>

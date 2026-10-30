@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useId } from 'react';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { GlassCard } from './GlassCard';
+import { useDialogA11y } from '../../hooks/useDialogA11y';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -11,13 +12,8 @@ interface BottomSheetProps {
 }
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, title, children }) => {
-  useEffect(() => {
-    if (isOpen) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = 'unset';
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen]);
+  const titleId = useId();
+  const panelRef = useDialogA11y<HTMLDivElement>(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -33,10 +29,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, title
         zIndex: 5000,
       }}
       onClick={onClose}
-      role="dialog"
-      aria-modal="true"
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        tabIndex={-1}
         className="animate-slide-up"
         onClick={(e) => e.stopPropagation()}
         style={{ width: '100%' }}
@@ -60,16 +59,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, title
               borderBottom: '1px solid var(--border-light)',
             }}
           >
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>{title}</h3>
+            <h2 id={titleId} style={{ margin: 0, fontSize: 'var(--text-base)' }}>{title}</h2>
             <button
+              type="button"
+              className="icon-btn"
               onClick={onClose}
               aria-label="Cerrar"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-              }}
+              data-dialog-close="true"
             >
               <X size={22} />
             </button>

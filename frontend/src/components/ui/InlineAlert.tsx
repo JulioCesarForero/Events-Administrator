@@ -12,9 +12,9 @@ interface InlineAlertProps {
 }
 
 const CONFIG: Record<Tone, { color: string; Icon: typeof Info }> = {
-  info: { color: '#00D4FF', Icon: Info },
-  success: { color: 'var(--accent-primary)', Icon: CheckCircle2 },
-  warn: { color: '#FFC107', Icon: AlertTriangle },
+  info: { color: 'var(--info)', Icon: Info },
+  success: { color: 'var(--success)', Icon: CheckCircle2 },
+  warn: { color: 'var(--warning)', Icon: AlertTriangle },
   error: { color: 'var(--error)', Icon: XCircle },
 };
 
@@ -36,7 +36,7 @@ export const InlineAlert: React.FC<InlineAlertProps> = ({
         gap: '12px',
       }}
     >
-      <Icon color={color} size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
+      <Icon color={color} size={20} aria-hidden="true" style={{ flexShrink: 0, marginTop: '2px' }} />
       <div style={{ flex: 1 }}>
         {title && <strong style={{ display: 'block' }}>{title}</strong>}
         {children && (
@@ -44,7 +44,7 @@ export const InlineAlert: React.FC<InlineAlertProps> = ({
             style={{
               marginTop: title ? '4px' : 0,
               color: 'var(--text-secondary)',
-              fontSize: '0.9rem',
+              fontSize: 'var(--text-sm)',
               lineHeight: 1.55,
             }}
           >

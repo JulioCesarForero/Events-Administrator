@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { QrCode, Download } from 'lucide-react';
 
 export const StaffDashboard = () => {
-  const { session, setSession, logout } = useAuthStaff();
+  const { session, logout } = useAuthStaff();
   const navigate = useNavigate();
   const [events, setEvents] = useState<any[]>([]);
   
@@ -38,23 +38,9 @@ export const StaffDashboard = () => {
   };
 
   useEffect(() => {
-    if (session) {
-      if (!session.tenantId && (!session.eventAssignments || session.eventAssignments.length === 0)) {
-        apiClient.get<any>('/auth/me', { token: session.accessToken, isBearer: true })
-          .then(res => {
-             const m = res.memberships?.[0];
-             setSession({
-               ...session,
-               tenantId: m?.tenantId || '',
-               role: m?.role || '',
-               eventAssignments: res.eventAssignments || [],
-             });
-          }).catch(console.error);
-      } else {
-        loadEvents();
-      }
-    }
-  }, [session, setSession]);
+    // RequireStaffAuth ya garantiza un tenant; sin él se muestra /staff/no-tenant.
+    if (session?.tenantId) loadEvents();
+  }, [session]);
 
   const loadEvents = async () => {
     try {
@@ -71,13 +57,6 @@ export const StaffDashboard = () => {
         } else {
           setEvents([]); // Dejarlo vacío para incitar a crear uno nuevo
         }
-      } else if (session?.eventAssignments && session.eventAssignments.length > 0) {
-        // Use eventAssignments instead
-        setEvents(session.eventAssignments.map((a: any) => ({
-          id: a.eventId,
-          name: a.eventName,
-          date: 'Asignado'
-        })));
       }
     } catch (err) {
       setEvents([{ id: 'demo-event', name: 'Evento Demo Graduación 2026 (Sin Conexión)', date: '2026-11-20' }]);
@@ -144,7 +123,7 @@ export const StaffDashboard = () => {
           
           return (
           <GlassCard key={ev.id} hoverEffect style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ fontSize: '1.2rem', margin: 0 }}>{ev.name}</h4>
+            <h4 style={{ fontSize: 'var(--text-xl)', margin: 0 }}>{ev.name}</h4>
             <p style={{ color: 'var(--text-secondary)' }}>Fecha: {ev.date}</p>
              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                {isSuperAdmin && (
@@ -195,7 +174,7 @@ export const StaffDashboard = () => {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderStyle: 'dashed' }} 
             className="glass-panel-hover"
           >
-            <span style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>+ Crear Nuevo Evento</span>
+            <span style={{ color: 'var(--accent-text)', fontWeight: 'bold' }}>+ Crear Nuevo Evento</span>
           </GlassCard>
         )}
       </div>
@@ -217,7 +196,7 @@ export const StaffDashboard = () => {
           )}
           
           {!isLoadingQr && qrImage === 'error' && (
-            <div style={{ padding: '20px', color: 'var(--accent-primary)', backgroundColor: 'rgba(255,59,48,0.1)', borderRadius: '8px' }}>
+            <div style={{ padding: '20px', color: 'var(--accent-text)', backgroundColor: 'var(--error-dim)', borderRadius: '8px' }}>
               Error al generar el código QR
             </div>
           )}
