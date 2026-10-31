@@ -6,7 +6,12 @@ import { BrowserRouter } from 'react-router-dom';
 
 vi.mock('lucide-react', () => ({
   Calendar: () => <div data-testid="icon-calendar" />,
-  Rocket: () => <div data-testid="icon-rocket" />
+  Rocket: () => <div data-testid="icon-rocket" />,
+  // Iconos de InlineAlert
+  AlertTriangle: () => <div data-testid="icon-alert" />,
+  CheckCircle2: () => <div data-testid="icon-check" />,
+  Info: () => <div data-testid="icon-info" />,
+  XCircle: () => <div data-testid="icon-x" />,
 }));
 
 vi.mock('../../../api/client', () => ({
@@ -18,9 +23,9 @@ vi.mock('../../../api/client', () => ({
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {
-    ...actual as any,
+    ...actual,
     useNavigate: () => mockNavigate,
   };
 });
@@ -58,11 +63,11 @@ describe('EventConfigStep', () => {
 
   it('submits 2 POST calls + 1 PUT call and shows the success screen', async () => {
     // POST /events and POST /layout-binding
-    (apiClient.post as any)
+    vi.mocked(apiClient.post)
       .mockResolvedValueOnce({ id: 'new_evt_1', name: 'Graduation 2026' })
       .mockResolvedValueOnce({ id: 'binding_id' });
     // PUT /configuration (doc 8 §4.2.1 uses PUT for event configuration)
-    (apiClient.put as any).mockResolvedValueOnce({ id: 'config_id' });
+    vi.mocked(apiClient.put).mockResolvedValueOnce({ id: 'config_id' });
 
     renderWithRouter(<EventConfigStep wizardData={baseWizardData} onPrev={mockOnPrev} sessionToken={sessionToken} />);
 
@@ -94,7 +99,7 @@ describe('EventConfigStep', () => {
   });
 
   it('stops flow and shows an inline error if any creation API fails', async () => {
-    (apiClient.post as any).mockRejectedValueOnce(new Error('DB Constraint Violation'));
+    vi.mocked(apiClient.post).mockRejectedValueOnce(new Error('DB Constraint Violation'));
 
     renderWithRouter(<EventConfigStep wizardData={baseWizardData} onPrev={mockOnPrev} sessionToken={sessionToken} />);
 

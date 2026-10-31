@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { GlassCard } from '../ui/GlassCard';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { InlineAlert } from '../ui/InlineAlert';
 import { apiClient } from '../../api/client';
 import type { WizardState } from '../../pages/staff/StaffEventWizard';
 import { Calendar, Rocket } from 'lucide-react';
@@ -54,7 +55,7 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
       }
 
       // 1. Create Event linking Venue
-       const resEvent = await apiClient.post<any>('/events', {
+       const resEvent = await apiClient.post<{ id?: string }>('/events', {
            tenantId: wizardData.tenantId,
            venueId: wizardData.venueId,
            name: formData.eventName,
@@ -88,9 +89,9 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
 
        // Remove the alert and navigation, we'll handle this in the UI
        setSuccessEventId(newEventId);
-    } catch (err: any) {
+    } catch (err: unknown) {
        console.error("Event creation error:", err);
-       setFormError(err?.message || 'No fue posible crear el evento.');
+       setFormError(err instanceof Error && err.message ? err.message : 'No fue posible crear el evento.');
     } finally {
       setLoading(false);
     }
@@ -122,8 +123,10 @@ export const EventConfigStep = ({ wizardData, onPrev, sessionToken }: Props) => 
          Establece las fechas de las etapas de venta. Has escogido el salón <strong>{wizardData.venueName}</strong> y Layout <strong>{wizardData.layoutName}</strong>.
       </p>
       {formError && (
-        <div role="alert" className="glass-panel" style={{ marginBottom: '16px', border: '1px solid var(--error)', color: 'var(--error)', padding: '12px 16px' }}>
-          {formError}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <InlineAlert tone="error" title="No se pudo crear el evento">
+            {formError}
+          </InlineAlert>
         </div>
       )}
 
