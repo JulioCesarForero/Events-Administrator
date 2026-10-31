@@ -3,6 +3,7 @@ import { useAuthStaff } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
 import { apiClient } from '../../api/client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, UploadCloud, Edit2, Trash2, Plus, Search } from 'lucide-react';
@@ -375,39 +376,38 @@ export const StaffStudents = () => {
       </GlassCard>
 
       {/* MODAL PARA EDICION/CREACION INDIVIDUAL */}
-      {showEditModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <GlassCard style={{ width: '100%', maxWidth: '400px', padding: '24px' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '24px' }}>{selectedStudent ? 'Editar Estudiante' : 'Añadir Estudiante'}</h3>
-            
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title={selectedStudent ? 'Editar estudiante' : 'Añadir estudiante'}
+      >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <Input label="Código Único" value={formData.studentCode} onChange={e => setFormData({...formData, studentCode: e.target.value})} />
               <Input label="Nombres" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
               <Input label="Apellidos" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
-              <Button variant="secondary" onClick={() => setShowEditModal(false)}>Cancelar</Button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: 'var(--space-6)' }}>
+              <Button variant="ghost" onClick={() => setShowEditModal(false)}>Cancelar</Button>
               <Button onClick={handleSaveStudent} disabled={!formData.studentCode || !formData.firstName}>
                 Guardar
               </Button>
             </div>
-          </GlassCard>
-        </div>
-      )}
+      </Modal>
 
       {/* MODAL PARA CARGA MASIVA */}
-      {showImportModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <GlassCard style={{ width: '100%', maxWidth: '500px', padding: '24px' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Importación Masiva de Estudiantes</h3>
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => { setShowImportModal(false); setFileToUpload(null); setParsedRows([]); }}
+        title="Importación masiva de estudiantes"
+      >
             <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: 'var(--text-sm)' }}>
               Sube el archivo CSV con las columnas <code style={{color:'var(--accent-text)'}}>codigo_unico</code>, <code style={{color:'var(--accent-text)'}}>apellidos</code>, y <code style={{color:'var(--accent-text)'}}>nombres</code>.
             </p>
 
             <div style={{ border: '2px dashed var(--border-light)', borderRadius: 'var(--radius-md)', padding: '32px', textAlign: 'center', marginBottom: '24px' }}>
               <UploadCloud size={32} style={{ color: 'var(--text-muted)', marginBottom: '16px' }} />
-              <p style={{ margin: 0, marginBottom: '16px' }}>Haz clic para elegir tu archivo CSV</p>
+              <p style={{ margin: 0, marginBottom: '16px' }}>Elige tu archivo CSV</p>
               <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
               <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
                 {fileToUpload ? fileToUpload.name : 'Seleccionar Archivo'}
@@ -420,16 +420,14 @@ export const StaffStudents = () => {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <Button variant="secondary" onClick={() => { setShowImportModal(false); setFileToUpload(null); setParsedRows([]); }}>
+              <Button variant="ghost" onClick={() => { setShowImportModal(false); setFileToUpload(null); setParsedRows([]); }}>
                 Cancelar
               </Button>
               <Button onClick={handleImportSubmit} disabled={!fileToUpload || isUploading} isLoading={loading || isUploading}>
                 {isUploading ? 'Subiendo...' : 'Importar'}
               </Button>
             </div>
-          </GlassCard>
-        </div>
-      )}
+      </Modal>
 
     </div>
   );

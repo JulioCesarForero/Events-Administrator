@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAuthPortal } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { statusLabel, statusTone } from '../../utils/status';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { CheckCircle2, Circle, Clock } from 'lucide-react';
@@ -88,18 +90,6 @@ function paymentStepDetails(
   }
 }
 
-function badgeColor(tone: StepDef['badge'] extends infer B ? (B extends { tone: infer T } ? T : never) : never) {
-  switch (tone) {
-    case 'success':
-      return { bg: 'var(--success-dim)', fg: 'var(--success)' };
-    case 'warn':
-      return { bg: 'var(--warning-dim)', fg: 'var(--warning)' };
-    case 'error':
-      return { bg: 'var(--error-dim)', fg: 'var(--error)' };
-    default:
-      return { bg: 'rgba(255,255,255,0.08)', fg: 'var(--text-secondary)' };
-  }
-}
 
 export const PortalDashboard = () => {
   const { session, logout } = useAuthPortal();
@@ -242,7 +232,7 @@ export const PortalDashboard = () => {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0 }}>Resumen de tu proceso</h2>
+          <h1 style={{ margin: 0, fontSize: 'var(--text-2xl)' }}>Resumen de tu proceso</h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: '6px' }}>
             Hola {group?.displayName || session.studentCode}. Este es el estado actual de tu
             reserva en el evento.
@@ -267,16 +257,37 @@ export const PortalDashboard = () => {
               <strong>{group?.approvedTicketCount ?? 0}</strong>
             </div>
           </div>
-          <div>
-            <small style={{ color: 'var(--text-secondary)' }}>En mesa / saldo</small>
-            <div style={{ fontSize: 'var(--text-lg)' }}>
-              <strong>
-                {group?.approvedTicketCount != null && group.approvedTicketCount > 0
-                  ? `${group?.activeSpotsReserved ?? 0} / ${group.approvedTicketCount} · libre: ${group?.availableReservationBalance ?? Math.max(0, (group?.approvedTicketCount ?? 0) - (group?.activeSpotsReserved ?? 0))}`
-                  : group?.reservationStatus || 'NONE'}
-              </strong>
+          {group?.approvedTicketCount != null && group.approvedTicketCount > 0 ? (
+            <>
+              <div>
+                <small style={{ color: 'var(--text-secondary)' }}>En mesa</small>
+                <div style={{ fontSize: 'var(--text-lg)' }}>
+                  <strong>{group?.activeSpotsReserved ?? 0}</strong>{' '}
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
+                    de {group.approvedTicketCount}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <small style={{ color: 'var(--text-secondary)' }}>Por ubicar</small>
+                <div style={{ fontSize: 'var(--text-lg)' }}>
+                  <strong>
+                    {group?.availableReservationBalance ??
+                      Math.max(0, group.approvedTicketCount - (group?.activeSpotsReserved ?? 0))}
+                  </strong>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <small style={{ color: 'var(--text-secondary)' }}>Reserva</small>
+              <div style={{ marginTop: 'var(--space-1)' }}>
+                <StatusBadge tone={statusTone(group?.reservationStatus)}>
+                  {statusLabel(group?.reservationStatus)}
+                </StatusBadge>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </GlassCard>
 
@@ -286,7 +297,7 @@ export const PortalDashboard = () => {
             <p style={{ color: 'var(--text-secondary)' }}>Cargando tu proceso…</p>
           </GlassCard>
         ) : (
-          steps.map((s) => {
+          steps.map((s, idx) => {
             const secondaryCta = s.secondaryCta;
             const Icon = s.status === 'done' ? CheckCircle2 : s.status === 'active' ? Clock : Circle;
             const iconColor =
@@ -296,26 +307,18 @@ export const PortalDashboard = () => {
                   ? 'var(--warning)'
                   : 'var(--text-muted)';
             return (
-              <GlassCard key={s.key} hoverEffect style={{ opacity: s.status === 'pending' ? 0.65 : 1 }}>
+              <GlassCard key={s.key} style={{ borderStyle: s.status === 'pending' ? 'dashed' : 'solid' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Icon size={22} color={iconColor} />
-                  <h3 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>{s.label}</h3>
+                  <Icon size={22} color={iconColor} aria-hidden="true" />
+                  <h3 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>
+                    <span className="sr-only">Paso {idx + 1}: </span>
+                    {s.label}
+                  </h3>
                 </div>
                 {s.badge && (
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      marginTop: '8px',
-                      padding: '3px 10px',
-                      borderRadius: '999px',
-                      fontSize: 'var(--text-xs)',
-                      fontWeight: 600,
-                      background: badgeColor(s.badge.tone).bg,
-                      color: badgeColor(s.badge.tone).fg,
-                    }}
-                  >
+                  <StatusBadge tone={s.badge.tone} style={{ marginTop: 'var(--space-2)' }}>
                     {s.badge.label}
-                  </span>
+                  </StatusBadge>
                 )}
                 <p style={{ color: 'var(--text-secondary)', margin: '10px 0' }}>{s.description}</p>
                 {s.hint && (

@@ -120,8 +120,8 @@ export const StaffAudit = () => {
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Actor</label>
-          <select
+          <label htmlFor="staff-audit-field-1" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Actor</label>
+          <select id="staff-audit-field-1"
             className="glass-input"
             value={actorFilter}
             onChange={(e) => setActorFilter(e.target.value as typeof actorFilter)}

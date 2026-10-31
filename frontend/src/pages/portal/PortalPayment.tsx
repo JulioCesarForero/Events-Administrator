@@ -336,10 +336,11 @@ export const PortalPayment = () => {
         <GlassCard>
           <h3 style={{ marginTop: 0 }}>Paso 1: ¿Cómo quieres pagar?</h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '16px 0 24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '12px', margin: '16px 0 24px' }}>
             <button
               type="button"
               onClick={() => setPaymentType('DIGITAL')}
+              aria-pressed={paymentType === 'DIGITAL'}
               style={{
                 padding: '16px',
                 borderRadius: 'var(--radius-md)',
@@ -358,6 +359,7 @@ export const PortalPayment = () => {
             <button
               type="button"
               onClick={() => setPaymentType('CASH')}
+              aria-pressed={paymentType === 'CASH'}
               style={{
                 padding: '16px',
                 borderRadius: 'var(--radius-md)',
@@ -378,6 +380,7 @@ export const PortalPayment = () => {
             <Input
               label="Cantidad de boletas"
               type="number"
+              inputMode="numeric"
               min="1"
               max="10"
               value={ticketQuantity}
@@ -457,12 +460,19 @@ export const PortalPayment = () => {
               : `Adjunta el pantallazo o PDF de la transferencia (máx. ${EVIDENCE_MAX_MB} MB).`}
           </p>
 
-          <div
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
+            aria-label={selectedFile ? `Cambiar archivo (seleccionado: ${selectedFile.name})` : 'Elegir imagen o PDF del comprobante'}
             style={{
-              border: `2px dashed ${selectedFile ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+              display: 'block',
+              width: '100%',
+              background: 'transparent',
+              color: 'inherit',
+              font: 'inherit',
+              border: `2px dashed ${selectedFile ? 'var(--accent-primary)' : 'var(--border-strong)'}`,
               borderRadius: 'var(--radius-md)',
-              padding: '40px',
+              padding: 'var(--space-8) var(--space-4)',
               textAlign: 'center',
               marginBottom: '24px',
               cursor: 'pointer',
@@ -471,7 +481,7 @@ export const PortalPayment = () => {
             {filePreview ? (
               <img
                 src={filePreview}
-                alt="Preview"
+                alt="Vista previa del comprobante"
                 style={{ maxHeight: '200px', borderRadius: '8px', objectFit: 'contain' }}
               />
             ) : (
@@ -484,17 +494,19 @@ export const PortalPayment = () => {
                   }}
                 />
                 <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-                  {selectedFile ? selectedFile.name : 'Haz clic para elegir imagen o PDF'}
+                  {selectedFile ? selectedFile.name : 'Toca para elegir imagen o PDF'}
                 </p>
               </>
             )}
-          </div>
+          </button>
 
           <input
             type="file"
             accept="image/*,.pdf"
             ref={fileInputRef}
             onChange={handleFileSelect}
+            tabIndex={-1}
+            aria-hidden="true"
             style={{ display: 'none' }}
           />
 

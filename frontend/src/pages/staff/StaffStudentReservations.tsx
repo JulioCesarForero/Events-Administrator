@@ -5,17 +5,13 @@ import { useAuthStaff } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { StatusBadge, type BadgeTone } from '../../components/ui/StatusBadge';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { Select } from '../../components/ui/Select';
+import { Modal } from '../../components/ui/Modal';
+import { statusLabel, statusTone } from '../../utils/status';
 import { API_BASE_URL, apiClient } from '../../api/client';
 
 type DetailTab = 'asistentes' | 'reservas' | 'acciones' | 'auditoria';
-
-const statusTone = (status: string): BadgeTone => {
-  if (status === 'CONFIRMED' || status === 'ACTIVE' || status === 'APPROVED') return 'success';
-  if (status === 'RELEASED' || status === 'CANCELLED' || status === 'REJECTED') return 'error';
-  if (status === 'PENDING') return 'warn';
-  return 'neutral';
-};
 
 const cellStyle: React.CSSProperties = { padding: '8px 6px', verticalAlign: 'middle' };
 const sectionStyle: React.CSSProperties = {
@@ -608,7 +604,7 @@ export const StaffStudentReservations = () => {
       </div>
 
       {error ? (
-        <p style={{ color: 'salmon', marginBottom: '12px' }}>{error}</p>
+        <p role="alert" style={{ color: 'var(--error)', marginBottom: '12px' }}>{error}</p>
       ) : null}
 
       <GlassCard style={{ marginBottom: '16px' }}>
@@ -616,7 +612,7 @@ export const StaffStudentReservations = () => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 160px), 1fr))',
             gap: '10px',
             marginBottom: '12px',
           }}
@@ -624,13 +620,22 @@ export const StaffStudentReservations = () => {
           <Input label="Código" value={studentCode} onChange={(e) => setStudentCode(e.target.value)} />
           <Input label="Nombre" value={name} onChange={(e) => setName(e.target.value)} />
           <Input label="Documento" value={documentId} onChange={(e) => setDocumentId(e.target.value)} />
-          <Input label="Estado pago" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} placeholder="APPROVED" />
-          <Input
-            label="Estado reserva (grupo)"
+          <Select label="Estado del pago" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
+            <option value="">Cualquiera</option>
+            {['PENDING_APPROVAL', 'APPROVED', 'REJECTED'].map((st) => (
+              <option key={st} value={st}>{statusLabel(st)}</option>
+            ))}
+          </Select>
+          <Select
+            label="Estado de la reserva"
             value={reservationStatus}
             onChange={(e) => setReservationStatus(e.target.value)}
-            placeholder="CONFIRMED"
-          />
+          >
+            <option value="">Cualquiera</option>
+            {['NONE', 'PENDING', 'CONFIRMED', 'RELEASED'].map((st) => (
+              <option key={st} value={st}>{statusLabel(st)}</option>
+            ))}
+          </Select>
           <Input label="Mesa (UUID)" value={layoutTableId} onChange={(e) => setLayoutTableId(e.target.value)} />
         </div>
         <Button onClick={() => void runSearch()} disabled={loading} icon={Search}>
@@ -673,7 +678,7 @@ export const StaffStudentReservations = () => {
                     </div>
                   ) : null}
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
-                    <StatusBadge tone={statusTone(r.reservationStatus)}>{r.reservationStatus}</StatusBadge>
+                    <StatusBadge tone={statusTone(r.reservationStatus)}>{statusLabel(r.reservationStatus)}</StatusBadge>
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
                       {r.activeSpotsReserved}/{r.approvedTicketCount} cupos
                     </span>
@@ -707,7 +712,7 @@ export const StaffStudentReservations = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px', marginTop: '8px' }}>
                   <SummaryStat label="Estado reserva">
                     <StatusBadge tone={statusTone(String(detail.summary.reservationStatus ?? ''))}>
-                      {String(detail.summary.reservationStatus ?? '—')}
+                      {statusLabel(detail.summary.reservationStatus ? String(detail.summary.reservationStatus) : null)}
                     </StatusBadge>
                   </SummaryStat>
                   <SummaryStat label="Boletas aprobadas">{String(detail.summary.approvedTicketCount ?? '—')}</SummaryStat>
@@ -823,7 +828,7 @@ export const StaffStudentReservations = () => {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: 0 }}>
-                          <StatusBadge tone={statusTone(rv.status)}>{rv.status}</StatusBadge>
+                          <StatusBadge tone={statusTone(rv.status)}>{statusLabel(rv.status)}</StatusBadge>
                           <span style={{ fontSize: 'var(--text-sm)' }}>{rv.totalSpotsReserved} cupos</span>
                           <code
                             title={rv.reservationId}
@@ -849,7 +854,7 @@ export const StaffStudentReservations = () => {
                             key={ln.id}
                             style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: 'rgba(255,255,255,0.06)' }}
                           >
-                            Mesa {ln.tableCode ?? ln.layoutTableId.slice(0, 8)} · {ln.spotsReserved} ({ln.status})
+                            Mesa {ln.tableCode ?? ln.layoutTableId.slice(0, 8)} · {ln.spotsReserved} ({statusLabel(ln.status)})
                           </span>
                         ))}
                       </div>
@@ -940,8 +945,8 @@ export const StaffStudentReservations = () => {
                         onChange={(e) => setMoveReservationId(e.target.value)}
                       />
                       <Input label="Motivo" value={moveReason} onChange={(e) => setMoveReason(e.target.value)} />
-                      <label style={{ display: 'block', fontSize: 'var(--text-sm)', marginBottom: '4px' }}>Allocations (JSON)</label>
-                      <textarea
+                      <label htmlFor="staff-student-reservations-field-1" style={{ display: 'block', fontSize: 'var(--text-sm)', marginBottom: '4px' }}>Allocations (JSON)</label>
+                      <textarea id="staff-student-reservations-field-1"
                         value={moveJson}
                         onChange={(e) => setMoveJson(e.target.value)}
                         rows={5}
@@ -989,21 +994,13 @@ export const StaffStudentReservations = () => {
         </GlassCard>
       </div>
 
-      {editParticipant ? (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-            padding: '16px',
-          }}
-        >
-          <GlassCard style={{ maxWidth: '480px', width: '100%' }}>
-            <h3>{editMode === 'replace' ? 'Reemplazar asistente' : 'Editar asistente'}</h3>
+      <Modal
+        isOpen={Boolean(editParticipant)}
+        onClose={() => setEditParticipant(null)}
+        title={editMode === 'replace' ? 'Reemplazar asistente' : 'Editar asistente'}
+      >
+        {editParticipant ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             {editMode === 'replace' ? (
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                 Reemplaza a {editParticipant.firstName} {editParticipant.lastName}.{' '}
@@ -1052,34 +1049,27 @@ export const StaffStudentReservations = () => {
               value={editForm.emergencyContactPhone ?? ''}
               onChange={(e) => setEditForm({ ...editForm, emergencyContactPhone: e.target.value })}
             />
-            {error ? <p style={{ color: 'salmon', margin: '8px 0 0' }}>{error}</p> : null}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            {error ? <p role="alert" style={{ color: 'var(--error)', margin: 0, fontSize: 'var(--text-sm)' }}>{error}</p> : null}
+            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+              <Button variant="ghost" onClick={() => setEditParticipant(null)}>
+                Cancelar
+              </Button>
               <Button onClick={() => void submitEdit()}>
                 {editMode === 'replace' ? 'Reemplazar' : 'Guardar'}
               </Button>
-              <Button variant="outline" onClick={() => setEditParticipant(null)}>
-                Cancelar
-              </Button>
             </div>
-          </GlassCard>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+      </Modal>
 
-      {deleteParticipant ? (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-            padding: '16px',
-          }}
-        >
-          <GlassCard style={{ maxWidth: '480px', width: '100%' }}>
-            <h3>Eliminar asistente</h3>
+      <Modal
+        isOpen={Boolean(deleteParticipant)}
+        onClose={() => setDeleteParticipant(null)}
+        title="Eliminar asistente"
+        role="alertdialog"
+      >
+        {deleteParticipant ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <p style={{ fontSize: 'var(--text-sm)' }}>
               Se eliminará el registro de {deleteParticipant.firstName} {deleteParticipant.lastName}.
             </p>
@@ -1090,18 +1080,18 @@ export const StaffStudentReservations = () => {
               </p>
             ) : null}
             <Input label="Motivo" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} />
-            {error ? <p style={{ color: 'salmon', margin: '8px 0 0' }}>{error}</p> : null}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-              <Button onClick={() => void submitDelete()} disabled={deleting}>
-                {deleting ? 'Eliminando…' : 'Eliminar'}
-              </Button>
-              <Button variant="outline" onClick={() => setDeleteParticipant(null)} disabled={deleting}>
+            {error ? <p role="alert" style={{ color: 'var(--error)', margin: 0, fontSize: 'var(--text-sm)' }}>{error}</p> : null}
+            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+              <Button variant="ghost" onClick={() => setDeleteParticipant(null)} disabled={deleting}>
                 Cancelar
               </Button>
+              <Button variant="danger" onClick={() => void submitDelete()} isLoading={deleting}>
+                Eliminar
+              </Button>
             </div>
-          </GlassCard>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };

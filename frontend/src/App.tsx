@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { Palette } from 'lucide-react';
 import {
   LegalViewerModal,
@@ -15,6 +15,7 @@ import { PortalPaymentStatus } from './pages/portal/PortalPaymentStatus';
 import { PortalLanding } from './pages/portal/PortalLanding';
 import { StaffLogin } from './pages/staff/StaffLogin';
 import { StaffNoTenant } from './pages/staff/StaffNoTenant';
+import { StaffShell } from './components/staff/StaffShell';
 import { StaffDashboard } from './pages/staff/StaffDashboard';
 import { StaffPayments } from './pages/staff/StaffPayments';
 import { StaffStudents } from './pages/staff/StaffStudents';
@@ -134,8 +135,10 @@ function ThemeSelector() {
 // Pantallas placeholder de Layouts
 const PortalLegalFooter = () => {
   const { eventId } = useParams();
+  const { pathname } = useLocation();
   const [legalType, setLegalType] = useState<LegalDocumentType | null>(null);
-  if (!eventId) return null;
+  // El login ya muestra estos enlaces dentro de la tarjeta.
+  if (!eventId || pathname.endsWith('/login')) return null;
   return (
     <footer
       style={{
@@ -207,18 +210,6 @@ const PortalLayout = ({ children }: { children: React.ReactNode }) => {
 };
 
 
-const StaffLayout = ({ children }: { children: React.ReactNode }) => (
-  <div className="animate-fade-in" style={{ minHeight: '100vh', display: 'flex' }}>
-    <aside className="glass-panel" style={{ width: '250px', borderRight: '1px solid var(--border-light)', borderRadius: 0 }}>
-      <div style={{ padding: '24px' }}>
-        <h3 style={{ color: 'var(--accent-text)' }}>Events Staff</h3>
-      </div>
-    </aside>
-    <main style={{ flex: 1, padding: '24px' }}>
-      {children}
-    </main>
-  </div>
-);
 
 // App.tsx main definition
 
@@ -256,7 +247,7 @@ export default function App() {
         
         {/* Staff Comité */}
         <Route path="/staff/*" element={
-          <StaffLayout>
+          <StaffShell>
             <Routes>
               <Route path="login" element={<StaffLogin />} />
               <Route path="no-tenant" element={<StaffNoTenant />} />
@@ -306,7 +297,7 @@ export default function App() {
               />
               <Route path="" element={<Navigate to="login" />} />
             </Routes>
-          </StaffLayout>
+          </StaffShell>
         } />
       </Routes>
     </BrowserRouter>

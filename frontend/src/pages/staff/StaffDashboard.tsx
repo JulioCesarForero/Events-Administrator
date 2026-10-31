@@ -5,12 +5,17 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { apiClient } from '../../api/client';
 import { useNavigate } from 'react-router-dom';
-import { QrCode, Download } from 'lucide-react';
+import { QrCode, Download, ArrowRight, Plus, RefreshCw } from 'lucide-react';
+import { InlineAlert } from '../../components/ui/InlineAlert';
+import { getEventPermissions } from '../../utils/staffPermissions';
+import { rememberEventNames } from '../../utils/eventNames';
 
 export const StaffDashboard = () => {
-  const { session, logout } = useAuthStaff();
+  const { session } = useAuthStaff();
   const navigate = useNavigate();
   const [events, setEvents] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrEventId, setQrEventId] = useState<string | null>(null);
@@ -43,23 +48,24 @@ export const StaffDashboard = () => {
   }, [session]);
 
   const loadEvents = async () => {
+    setLoadError(null);
     try {
       if (session?.tenantId) {
         const res = await apiClient.get<any>(`/events?tenant_id=${session?.tenantId}`, { token: session?.accessToken, isBearer: true });
         const items = Array.isArray(res) ? res : (res as any)?.items || [];
-        
-        if (items.length > 0) {
-          setEvents(items.map((ev: any) => ({
-            id: ev.id,
-            name: ev.name,
-            date: ev.eventDate ? new Date(ev.eventDate).toLocaleDateString() : (ev.date || 'Sin Fecha')
-          })));
-        } else {
-          setEvents([]); // Dejarlo vacío para incitar a crear uno nuevo
-        }
+        const mapped = items.map((ev: any) => ({
+          id: ev.id,
+          name: ev.name,
+          date: ev.eventDate ? new Date(ev.eventDate).toLocaleDateString('es-CO') : (ev.date || 'Sin fecha'),
+        }));
+        setEvents(mapped);
+        rememberEventNames(mapped);
       }
     } catch (err) {
-      setEvents([{ id: 'demo-event', name: 'Evento Demo Graduación 2026 (Sin Conexión)', date: '2026-11-20' }]);
+      setEvents([]);
+      setLoadError(err instanceof Error && err.message ? err.message : 'Revisa tu conexión e inténtalo de nuevo.');
+    } finally {
+      setLoaded(true);
     }
   };
 
@@ -72,110 +78,88 @@ export const StaffDashboard = () => {
     );
   }
 
-
-  const isAdmin = ['ADMIN', 'OWNER', 'TENANT_ADMIN', 'SUPER_ADMIN'].includes(session.role || '');
-  const isSuperAdmin = session.role === 'SUPER_ADMIN';
+  const { isAdmin, isSuperAdmin } = getEventPermissions(session);
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Panel General</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            Bienvenido, {session.email}
-            {session.role ? ` · Rol ${session.role}` : ''}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {isAdmin && (
-            <Button
-              variant="secondary"
-              onClick={() => navigate('/staff/admin/staff-users')}
-            >
-              Gestión de Staff
-            </Button>
-          )}
-          {isSuperAdmin && (
-            <Button
-              variant="secondary"
-              onClick={() => navigate('/staff/admin/system-users')}
-            >
-              Gestión de Sistema
-            </Button>
-          )}
-          <Button variant="outline" onClick={logout}>Cerrar Sesión</Button>
-        </div>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: 'var(--text-2xl)' }}>Mis eventos</h1>
+        <p style={{ color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
+          Elige un evento para revisar pagos, estudiantes y reservas.
+        </p>
       </div>
 
-      <h3 style={{ marginTop: '20px' }}>Mis Eventos</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-        {events.length === 0 && (
-          <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'center' }}>
+      {loadError && (
+        <InlineAlert
+          tone="error"
+          title="No se pudieron cargar tus eventos"
+          actions={
+            <Button size="sm" variant="outline" icon={RefreshCw} onClick={loadEvents}>
+              Reintentar
+            </Button>
+          }
+        >
+          {loadError}
+        </InlineAlert>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 'var(--space-5)' }}>
+        {loaded && !loadError && events.length === 0 && (
+          <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', justifyContent: 'center' }}>
             <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No tienes eventos activos.</p>
           </GlassCard>
         )}
         {events.map(ev => {
-          const userAssignment = session.eventAssignments?.find(a => a.eventId === ev.id);
-          const eventRole = userAssignment?.role || session.role;
-          const isPaymentStaff = ['CASHIER', 'ORGANIZER', 'COORDINATOR'].includes(eventRole || '');
-          const isViewer = ['REVIEWER', 'ORGANIZER', 'COORDINATOR', 'CASHIER'].includes(eventRole || '');
-          const isOrganizer = ['ORGANIZER', 'COORDINATOR'].includes(eventRole || '');
-          
+          const perms = getEventPermissions(session, ev.id);
+          const primaryPath = perms.canViewOperations
+            ? `/staff/events/${ev.id}/payments`
+            : perms.canEditMap
+              ? `/staff/events/${ev.id}/map`
+              : null;
+
           return (
-          <GlassCard key={ev.id} hoverEffect style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ fontSize: 'var(--text-xl)', margin: 0 }}>{ev.name}</h4>
-            <p style={{ color: 'var(--text-secondary)' }}>Fecha: {ev.date}</p>
-             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-               {isSuperAdmin && (
-                 <Button size="sm" variant="outline" onClick={() => handleGenerateQR(ev.id)} icon={QrCode}>
-                   QR Portal
-                 </Button>
-               )}
-               {(isAdmin || isPaymentStaff || isViewer) && (
-                 <Button size="sm" onClick={() => navigate(`/staff/events/${ev.id}/payments`)}>Revisión Pagos</Button>
-               )}
-               {(isAdmin || isPaymentStaff || isViewer) && (
-                 <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/students`)}>Estudiantes</Button>
-               )}
-               {(isAdmin || isPaymentStaff || isViewer) && (
-                 <Button
-                   size="sm"
-                   variant="outline"
-                   onClick={() => navigate(`/staff/events/${ev.id}/student-reservations`)}
-                 >
-                   Reservas
-                 </Button>
-               )}
-               
-               {(isAdmin || isOrganizer) && (
-                 <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/map`)}>Diseño de Plano</Button>
-               )}
-               
-               {isAdmin && (
-                 <>
-                   <Button size="sm" variant="secondary" onClick={() => navigate(`/staff/events/${ev.id}/policies`)}>Políticas</Button>
-                   <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/manual-adjustments`)}>Ajustes</Button>
-                   <Button size="sm" variant="outline" onClick={() => navigate(`/staff/events/${ev.id}/audit`)}>Auditoría</Button>
-                   <Button
-                     size="sm"
-                     variant="secondary"
-                     onClick={() => navigate(`/staff/events/${ev.id}/staff`)}
-                   >
-                     Staff del evento
-                   </Button>
-                 </>
-               )}
-            </div>
-          </GlassCard>
-        )})}
+            <GlassCard key={ev.id} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div>
+                <h2 style={{ fontSize: 'var(--text-xl)', margin: 0 }}>{ev.name}</h2>
+                <p style={{ color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>Fecha: {ev.date}</p>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'auto' }}>
+                {primaryPath && (
+                  <Button onClick={() => navigate(primaryPath)} icon={ArrowRight} style={{ flex: 1 }}>
+                    Abrir evento
+                  </Button>
+                )}
+                {isSuperAdmin && (
+                  <Button variant="outline" onClick={() => handleGenerateQR(ev.id)} icon={QrCode}>
+                    QR del portal
+                  </Button>
+                )}
+              </div>
+            </GlassCard>
+          );
+        })}
         {isAdmin && (
-          <GlassCard 
-            onClick={() => navigate('/staff/events/new')} 
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderStyle: 'dashed' }} 
-            className="glass-panel-hover"
+          <button
+            type="button"
+            onClick={() => navigate('/staff/events/new')}
+            className="glass-panel glass-panel-hover"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 'var(--space-2)',
+              minHeight: '140px',
+              cursor: 'pointer',
+              borderStyle: 'dashed',
+              color: 'var(--accent-text)',
+              fontFamily: 'inherit',
+              fontSize: 'var(--text-base)',
+              fontWeight: 700,
+            }}
           >
-            <span style={{ color: 'var(--accent-text)', fontWeight: 'bold' }}>+ Crear Nuevo Evento</span>
-          </GlassCard>
+            <Plus size={20} aria-hidden="true" />
+            Crear nuevo evento
+          </button>
         )}
       </div>
 
@@ -196,7 +180,7 @@ export const StaffDashboard = () => {
           )}
           
           {!isLoadingQr && qrImage === 'error' && (
-            <div style={{ padding: '20px', color: 'var(--accent-text)', backgroundColor: 'var(--error-dim)', borderRadius: '8px' }}>
+            <div style={{ padding: '20px', color: 'var(--error)', backgroundColor: 'var(--error-dim)', borderRadius: '8px' }}>
               Error al generar el código QR
             </div>
           )}

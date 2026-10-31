@@ -21,9 +21,13 @@ Backlog de mejoras de diseño identificadas en la crítica de diseño del 2026-1
 
 **Criterio de aceptación sugerido:** todos los usuarios de un mismo tenant/evento ven el mismo tema; ningún control flotante tapa acciones primarias en anchos de 360 px.
 
-## UX-02 · Navegación de la consola de staff
+## UX-02 · Navegación de la consola de staff — ✅ resuelto (2026-10-30)
 
-La barra lateral del staff (`StaffLayout` en `frontend/src/App.tsx`) no tiene navegación y no es responsive. Cada tarjeta de evento del dashboard muestra hasta 9 botones. Propuesta: navegación por evento en la barra lateral, filtrada por rol, que en celular se convierta en `Drawer`.
+`StaffShell` (`frontend/src/components/staff/StaffShell.tsx`) reemplazó la barra lateral vacía. Muestra navegación general y del evento actual filtrada por rol (`utils/staffPermissions.ts`); en celular se abre en un `Drawer`, y en el login y la pantalla sin tenant no aparece.
+
+Queda por definir:
+- El nombre del evento en el menú sale de `eventAssignments` o, para administradores del tenant, de la lista que cargó el dashboard (`sessionStorage`). Si alguien abre un enlace directo a un evento, ve "Evento actual". Un endpoint o un campo con el nombre del evento lo resolvería.
+- Los botones "← volver" de cada pantalla ya no son necesarios con el menú; se pueden retirar.
 
 ## UX-03 · Diálogos nativos restantes
 
@@ -38,3 +42,11 @@ Gran parte de las pantallas usa estilos inline (más de 800 `style={{…}}`). Lo
 ## UX-05 · Colores del plano (Konva)
 
 `EventMap.tsx` dibuja en canvas: allí `var(--accent-primary)` no se resuelve y los colores verdes están fijos. Hay que leer los tokens con `getComputedStyle` para que el plano siga el tema activo.
+
+## UX-06 · Títulos y jerarquía de encabezados
+
+Ya usan `h1` el login del staff, el login del portal, "Mis eventos", "Resumen de tu proceso" y la pantalla sin tenant. El resto de pantallas sigue usando `h2` como título principal; pasarlas a `h1` al tocarlas.
+
+## UX-07 · Mensajes de error de la API
+
+Algunos errores llegan en inglés y técnicos desde el backend (p. ej. "Invalid token" con un token vencido). Conviene mapear los códigos de error de la API a mensajes en español y, ante un 401, redirigir al login con un aviso de sesión vencida.

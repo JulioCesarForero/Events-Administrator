@@ -16,6 +16,7 @@ import {
   Send,
   FilePlus,
 } from 'lucide-react';
+import { statusLabel } from '../../utils/status';
 
 type DocType = 'DATA_POLICY' | 'EVENT_TERMS';
 type DocStatus = 'DRAFT' | 'PUBLISHED';
@@ -292,7 +293,7 @@ export const StaffPolicies = () => {
                       color: d.status === 'PUBLISHED' ? 'var(--success)' : 'var(--warning)',
                     }}
                   >
-                    {d.status}
+                    {statusLabel(d.status)}
                   </span>
                 </div>
                 <small style={{ color: 'var(--text-secondary)' }}>
@@ -340,10 +341,10 @@ export const StaffPolicies = () => {
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
+              <label htmlFor="staff-policies-field-1" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
                 Instrucciones de Pago (Canales autorizados)
               </label>
-              <textarea
+              <textarea id="staff-policies-field-1"
                 className="glass-input"
                 style={{ minHeight: '120px', resize: 'vertical' }}
                 value={configForm.paymentInstructions}
@@ -387,10 +388,10 @@ export const StaffPolicies = () => {
             onChange={(e) => setForm({ ...form, versionLabel: e.target.value })}
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            <label htmlFor="staff-policies-field-2" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
               Contenido (Markdown)
             </label>
-            <textarea
+            <textarea id="staff-policies-field-2"
               className="glass-input"
               style={{ minHeight: '220px', resize: 'vertical' }}
               value={form.contentMarkdown}

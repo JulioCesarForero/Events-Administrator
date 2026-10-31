@@ -10,6 +10,7 @@ import { EventMap } from '../../components/ui/EventMap';
 import { LegalMarkdownBlock } from '../../components/ui/LegalMarkdownBlock';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { MapTable } from '../../api/types';
+import { statusLabel } from '../../utils/status';
 
 interface LegalDoc {
   id: string;
@@ -474,7 +475,7 @@ export const PortalMap = () => {
             <div style={{ textAlign: 'center', marginBottom: '16px' }}>
               <CheckCircle2 size={48} style={{ color: 'var(--success)' }} />
               <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>
-                Estado: <strong>{confirmation.status}</strong>
+                Estado: <strong>{statusLabel(confirmation.status)}</strong>
               </p>
             </div>
 

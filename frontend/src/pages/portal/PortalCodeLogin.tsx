@@ -59,7 +59,7 @@ export const PortalCodeLogin = () => {
   return (
     <GlassCard className="animate-slide-up" style={{ maxWidth: '400px', margin: '40px auto' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <h2 style={{ marginBottom: '8px' }}>Acceso al Evento</h2>
+        <h1 style={{ marginBottom: '8px', fontSize: 'var(--text-2xl)' }}>Acceso al Evento</h1>
         <p style={{ color: 'var(--text-secondary)' }}>
           Ingresa con tu código único de estudiante para acceder a tu reserva.
         </p>
@@ -69,6 +69,9 @@ export const PortalCodeLogin = () => {
         <Input
           label="Código de Estudiante"
           placeholder="Ej: EST-2026-0042"
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
           icon={Key}
           value={code}
           onChange={(e) => setCode(e.target.value)}

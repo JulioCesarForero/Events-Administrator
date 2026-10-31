@@ -184,10 +184,10 @@ export const StaffManualAdjustments = () => {
 
         {action === 'CUSTOM' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            <label htmlFor="staff-manual-adjustments-field-1" style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
               Payload (JSON)
             </label>
-            <textarea
+            <textarea id="staff-manual-adjustments-field-1"
               className="glass-input"
               style={{ minHeight: '160px', resize: 'vertical', fontFamily: 'monospace' }}
               value={customPayload}

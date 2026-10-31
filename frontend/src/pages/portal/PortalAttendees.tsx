@@ -4,6 +4,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { Select } from '../../components/ui/Select';
 import { apiClient, type ApiError } from '../../api/client';
 import { UserPlus, Trash2, ArrowLeft, CalendarClock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -229,7 +230,7 @@ export const PortalAttendees = () => {
           {attendees.map((att, idx) => (
             <GlassCard
               key={att.id || idx}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}
             >
               <div>
                 <h4 style={{ margin: 0 }}>
@@ -270,72 +271,76 @@ export const PortalAttendees = () => {
             style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}
             onSubmit={handleAdd}
           >
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div className="form-row">
               <Input
                 label="Nombres"
+                autoComplete="given-name"
                 required
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
               />
               <Input
                 label="Apellidos"
+                autoComplete="family-name"
                 required
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
               />
             </div>
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  Tipo Doc.
-                </label>
-                <select
-                  className="glass-input"
-                  value={formData.documentType}
-                  onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
-                >
-                  <option value="CC">Cédula (CC)</option>
-                  <option value="TI">Tarjeta Identidad (TI)</option>
-                  <option value="CE">Cédula Extranjería (CE)</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <Input
-                  label="Documento"
-                  required
-                  type="number"
-                  value={formData.documentId}
-                  onChange={(e) => setFormData({ ...formData, documentId: e.target.value })}
-                />
-              </div>
+            <div className="form-row">
+              <Select
+                label="Tipo de documento"
+                value={formData.documentType}
+                onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
+              >
+                <option value="CC">Cédula (CC)</option>
+                <option value="TI">Tarjeta Identidad (TI)</option>
+                <option value="CE">Cédula Extranjería (CE)</option>
+              </Select>
+              <Input
+                label="Número de documento"
+                required
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                title="Solo números, sin puntos ni espacios"
+                autoComplete="off"
+                value={formData.documentId}
+                onChange={(e) => setFormData({ ...formData, documentId: e.target.value.replace(/\D/g, '') })}
+              />
             </div>
 
             <Input
               label="Celular"
               required
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={formData.mobilePhone}
               onChange={(e) => setFormData({ ...formData, mobilePhone: e.target.value })}
             />
 
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div className="form-row">
               <Input
-                label="Contacto Emergencia"
+                label="Contacto de emergencia"
                 required
                 value={formData.emergencyContactName}
                 onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
               />
               <Input
-                label="Teléfono Emergencia"
+                label="Teléfono de emergencia"
                 required
                 type="tel"
+                inputMode="tel"
+                autoComplete="off"
                 value={formData.emergencyContactPhone}
                 onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '20px', margin: '16px 0', flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <fieldset style={{ border: 'none', display: 'flex', gap: 'var(--space-2) var(--space-5)', margin: 'var(--space-2) 0', flexWrap: 'wrap' }}>
+              <legend className="sr-only">Condiciones especiales</legend>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minHeight: 'var(--target-min)' }}>
                 <input
                   type="checkbox"
                   checked={formData.isVegetarian}
@@ -343,7 +348,7 @@ export const PortalAttendees = () => {
                 />
                 Vegetariano
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minHeight: 'var(--target-min)' }}>
                 <input
                   type="checkbox"
                   checked={formData.hasReducedMobility}
@@ -351,7 +356,7 @@ export const PortalAttendees = () => {
                 />
                 Movilidad Reducida
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minHeight: 'var(--target-min)' }}>
                 <input
                   type="checkbox"
                   checked={formData.hasAllergies}
@@ -365,7 +370,7 @@ export const PortalAttendees = () => {
                 />
                 Alergias Alimentarias
               </label>
-            </div>
+            </fieldset>
 
             {formData.hasAllergies && (
               <Input
@@ -377,10 +382,10 @@ export const PortalAttendees = () => {
             )}
 
             {formError && (
-              <p style={{ color: 'var(--error)', fontSize: 'var(--text-sm)' }}>{formError}</p>
+              <p role="alert" style={{ color: 'var(--error)', fontSize: 'var(--text-sm)' }}>{formError}</p>
             )}
 
-            <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
               <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
                 Cancelar
               </Button>
@@ -406,7 +411,7 @@ export const PortalAttendees = () => {
         </p>
 
         {deleteError && (
-          <p style={{ marginTop: 0, marginBottom: '12px', color: 'var(--error)', fontSize: 'var(--text-sm)' }}>
+          <p role="alert" style={{ marginTop: 0, marginBottom: '12px', color: 'var(--error)', fontSize: 'var(--text-sm)' }}>
             {deleteError}
           </p>
         )}
@@ -415,8 +420,8 @@ export const PortalAttendees = () => {
           <Button type="button" variant="secondary" onClick={closeDeleteModal} disabled={deleting}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleConfirmDelete} isLoading={deleting}>
-            Aceptar
+          <Button type="button" variant="danger" onClick={handleConfirmDelete} isLoading={deleting}>
+            Eliminar
           </Button>
         </div>
       </Modal>

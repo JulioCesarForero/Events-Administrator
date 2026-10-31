@@ -59,7 +59,7 @@ export const StaffLogin = () => {
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
       <GlassCard className="animate-slide-up" style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h2 style={{ marginBottom: '8px' }}>Acceso Staff</h2>
+          <h1 style={{ marginBottom: '8px', fontSize: 'var(--text-2xl)' }}>Acceso Staff</h1>
           <p style={{ color: 'var(--text-secondary)' }}>Ingresa al panel administrativo</p>
         </div>
 
@@ -67,6 +67,8 @@ export const StaffLogin = () => {
           <Input
             label="Correo Electrónico"
             type="email"
+            autoComplete="username"
+            inputMode="email"
             placeholder="admin@events.com"
             icon={Mail}
             value={email}
@@ -75,6 +77,7 @@ export const StaffLogin = () => {
           <Input
             label="Contraseña"
             type="password"
+            autoComplete="current-password"
             placeholder="••••••••"
             icon={Lock}
             value={password}

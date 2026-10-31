@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
+import { Select } from '../../components/ui/Select';
+import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
 import { apiClient } from '../../api/client';
 import { useAuthStaff } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { statusLabel } from '../../utils/status';
 
 export const SystemUsers = () => {
   const { session } = useAuthStaff();
@@ -139,7 +143,7 @@ export const SystemUsers = () => {
             <input 
               type="text" 
               className="glass-input" 
-              style={{ marginLeft: '8px', minWidth: '300px' }}
+              style={{ marginLeft: '8px', minWidth: 'min(300px, 100%)' }}
               value={tenantId}
               onChange={e => setTenantId(e.target.value)}
               placeholder="UUID del Tenant"
@@ -178,7 +182,7 @@ export const SystemUsers = () => {
                       background: u.status === 'ACTIVE' ? 'var(--success-dim)' : 'var(--error-dim)',
                       color: u.status === 'ACTIVE' ? 'var(--success)' : 'var(--error)'
                     }}>
-                      {u.status}
+                      {statusLabel(u.status)}
                     </span>
                   </td>
                   <td style={{ padding: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -203,79 +207,73 @@ export const SystemUsers = () => {
         )}
       </GlassCard>
 
-      {isCreateOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <GlassCard style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ margin: 0 }}>Crear Usuario Global</h3>
-            <input 
-              type="text" className="glass-input" placeholder="Nombre completo" 
-              value={newUser.displayName} onChange={e => setNewUser({...newUser, displayName: e.target.value})} 
-            />
-            <input 
-              type="email" className="glass-input" placeholder="Correo electrónico" 
-              value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} 
-            />
-            <input 
-              type="password" className="glass-input" placeholder="Contraseña temporal" 
-              value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} 
-            />
-            <select 
-              className="glass-input"
-              value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}
-            >
-              <option value="TENANT_ADMIN">TENANT_ADMIN</option>
-              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-              <option value="STAFF">STAFF</option>
-            </select>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-              <Button onClick={handleCreate} disabled={!newUser.email || !newUser.password || !newUser.displayName}>Guardar</Button>
-            </div>
-          </GlassCard>
+      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Crear usuario global">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <Input
+            label="Nombre completo"
+            autoComplete="off"
+            value={newUser.displayName}
+            onChange={e => setNewUser({...newUser, displayName: e.target.value})}
+          />
+          <Input
+            label="Correo electrónico"
+            type="email"
+            autoComplete="off"
+            value={newUser.email}
+            onChange={e => setNewUser({...newUser, email: e.target.value})}
+          />
+          <Input
+            label="Contraseña temporal"
+            type="password"
+            autoComplete="new-password"
+            value={newUser.password}
+            onChange={e => setNewUser({...newUser, password: e.target.value})}
+          />
+          <Select label="Rol" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}>
+            <option value="TENANT_ADMIN">Administrador de tenant</option>
+            <option value="SUPER_ADMIN">Administrador de plataforma</option>
+            <option value="STAFF">Staff</option>
+          </Select>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <Button variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreate} disabled={!newUser.email || !newUser.password || !newUser.displayName}>Guardar</Button>
+          </div>
         </div>
-      )}
+      </Modal>
 
-      {isResetOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <GlassCard style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
-            <h3 style={{ margin: 0 }}>Contraseña Reseteada</h3>
-            <p>Se ha generado una nueva contraseña para {selectedUser?.email}</p>
-            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontFamily: 'monospace', fontSize: 'var(--text-xl)' }}>
-              {tempPassword}
-            </div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-              Por favor copia esta contraseña y compártela de forma segura. No se volverá a mostrar.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
-              <Button onClick={() => setIsResetOpen(false)}>Cerrar</Button>
-            </div>
-          </GlassCard>
+      <Modal isOpen={isResetOpen} onClose={() => setIsResetOpen(false)} title="Contraseña reseteada">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', textAlign: 'center' }}>
+          <p>Se generó una nueva contraseña para {selectedUser?.email}</p>
+          <div style={{ padding: 'var(--space-4)', background: 'rgba(255,255,255,0.1)', borderRadius: 'var(--radius-sm)', fontFamily: 'monospace', fontSize: 'var(--text-xl)', wordBreak: 'break-all' }}>
+            {tempPassword}
+          </div>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+            Copia esta contraseña y compártela por un canal seguro. No se volverá a mostrar.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <Button onClick={() => setIsResetOpen(false)}>Cerrar</Button>
+          </div>
         </div>
-      )}
+      </Modal>
 
-      {isEditOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <GlassCard style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ margin: 0 }}>Editar Usuario</h3>
-            <input 
-              type="text" className="glass-input" placeholder="Nombre completo" 
-              value={editUser.displayName} onChange={e => setEditUser({...editUser, displayName: e.target.value})} 
-            />
-            <select 
-              className="glass-input"
-              value={editUser.role} onChange={e => setEditUser({...editUser, role: e.target.value})}
-            >
-              <option value="TENANT_ADMIN">TENANT_ADMIN</option>
-              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-              <option value="STAFF">STAFF</option>
-            </select>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
-              <Button onClick={handleEditSubmit} disabled={!editUser.displayName}>Guardar</Button>
-            </div>
-          </GlassCard>
+      <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Editar usuario">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <Input
+            label="Nombre completo"
+            value={editUser.displayName}
+            onChange={e => setEditUser({...editUser, displayName: e.target.value})}
+          />
+          <Select label="Rol" value={editUser.role} onChange={e => setEditUser({...editUser, role: e.target.value})}>
+            <option value="TENANT_ADMIN">Administrador de tenant</option>
+            <option value="SUPER_ADMIN">Administrador de plataforma</option>
+            <option value="STAFF">Staff</option>
+          </Select>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <Button variant="ghost" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
+            <Button onClick={handleEditSubmit} disabled={!editUser.displayName}>Guardar</Button>
+          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

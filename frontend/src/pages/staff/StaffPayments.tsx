@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStaff } from '../../contexts/AuthContext';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
+import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { apiClient } from '../../api/client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, X, Eye, AlertTriangle, ExternalLink, FileText, Filter } from 'lucide-react';
+import { statusLabel } from '../../utils/status';
 
 interface PaymentRow {
   id: string;
@@ -215,43 +217,33 @@ export const StaffPayments = () => {
       </div>
 
       <GlassCard style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', alignItems: 'end' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-              Buscar estudiante o grupo
-            </label>
-            <input
-              className="glass-input"
-              placeholder="Código estudiante, nombre, grupo o tipo de pago"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-            />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Estado</label>
-            <select
-              className="glass-input"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ALL')}
-            >
-              <option value="PENDING_APPROVAL">Pendiente</option>
-              <option value="APPROVED">Aprobado</option>
-              <option value="REJECTED">Rechazado</option>
-              <option value="ALL">Todos</option>
-            </select>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Tipo de pago</label>
-            <select
-              className="glass-input"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as 'ALL' | 'DIGITAL' | 'CASH')}
-            >
-              <option value="ALL">Todos</option>
-              <option value="DIGITAL">Digital</option>
-              <option value="CASH">Efectivo</option>
-            </select>
-          </div>
+        <div className="filter-grid">
+          <Input
+            label="Buscar estudiante o grupo"
+            type="search"
+            placeholder="Código, nombre, grupo o tipo de pago"
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+          />
+          <Select
+            label="Estado"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ALL')}
+          >
+            <option value="PENDING_APPROVAL">Pendiente</option>
+            <option value="APPROVED">Aprobado</option>
+            <option value="REJECTED">Rechazado</option>
+            <option value="ALL">Todos</option>
+          </Select>
+          <Select
+            label="Tipo de pago"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as 'ALL' | 'DIGITAL' | 'CASH')}
+          >
+            <option value="ALL">Todos</option>
+            <option value="DIGITAL">Digital</option>
+            <option value="CASH">Efectivo</option>
+          </Select>
         </div>
         <div style={{ marginTop: '10px', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Filter size={14} />
@@ -292,7 +284,7 @@ export const StaffPayments = () => {
               </h4>
               <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', flexWrap: 'wrap' }}>
                 {p.studentCodeSnapshot && <span>Código: <strong>{p.studentCodeSnapshot}</strong></span>}
-                <span>Estado: <strong>{p.status}</strong></span>
+                <span>Estado: <strong>{statusLabel(p.status)}</strong></span>
                 <span>Tipo: <strong>{p.paymentType}</strong></span>
                 <span>Boletas: <strong>{p.ticketQuantity}</strong></span>
                 {typeof p.amountCents === 'number' && (
@@ -345,7 +337,7 @@ export const StaffPayments = () => {
         {active && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <strong>Estado:</strong> {active.status}
+              <strong>Estado:</strong> {statusLabel(active.status)}
             </div>
             <div>
               <strong>Grupo:</strong> {active.attendeeGroupId}

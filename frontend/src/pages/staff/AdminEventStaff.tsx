@@ -7,6 +7,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { apiClient } from '../../api/client';
+import { statusLabel } from '../../utils/status';
 
 interface StaffUserRow {
   id: string;
@@ -221,7 +222,7 @@ export const AdminEventStaff = () => {
                               : 'var(--text-muted)',
                         }}
                       >
-                        {a.status}
+                        {statusLabel(a.status)}
                       </span>
                     </td>
                     <td style={{ padding: '10px 12px' }}>

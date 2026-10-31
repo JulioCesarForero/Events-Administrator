@@ -312,8 +312,8 @@ export const StaffMap = () => {
             <GlassCard>
               <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Herramientas de Edición</h3>
               
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Da click aquí para añadir un objeto:</label>
-              <select 
+              <label htmlFor="staff-map-field-1" style={{ display: 'block', marginBottom: '8px', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Da click aquí para añadir un objeto:</label>
+              <select id="staff-map-field-1" 
                 onChange={(e) => { addLayoutObject(e.target.value); e.target.value = ''; }}
                 style={{
                   width: '100%',

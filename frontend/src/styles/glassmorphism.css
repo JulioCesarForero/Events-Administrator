@@ -180,3 +180,31 @@
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+
+/*
+ * Fila de formulario: campos lado a lado en pantallas anchas y
+ * en una sola columna cuando no caben (~220px por campo).
+ */
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.form-row > * {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* Grilla de filtros que se apila en celular */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+
+select.glass-input option {
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
